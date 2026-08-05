@@ -68,6 +68,10 @@ public sealed class PublicApiContractTests
           property System.Text.Json.Nodes.JsonNode Schema
           method static Penghou.Nuwa.JsonSchemaExpectation FromSchemaJson(System.String)
           method static Penghou.Nuwa.JsonSchemaExpectation FromSchemaNode(System.Text.Json.Nodes.JsonNode)
+          method static Penghou.Nuwa.JsonSchemaExpectation FromType<T>()
+          method static Penghou.Nuwa.JsonSchemaExpectation FromType<T>(System.Text.Json.JsonSerializerOptions)
+          method static Penghou.Nuwa.JsonSchemaExpectation FromType(System.Type)
+          method static Penghou.Nuwa.JsonSchemaExpectation FromType(System.Type, System.Text.Json.JsonSerializerOptions)
           method Penghou.Nuwa.JsonSchemaExpectation GetItem()
           method Penghou.Nuwa.JsonSchemaExpectation GetProperty(System.String)
           method System.Collections.Generic.IReadOnlySet<System.String> GetStringPropertyNames()

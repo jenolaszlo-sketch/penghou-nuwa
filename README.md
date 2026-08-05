@@ -92,6 +92,24 @@ if (result.Succeeded)
 }
 ```
 
+No JSON Schema handy? Derive the expectation directly from the CLR type the
+payload should deserialize into — property kinds (string/number/boolean/
+object/array) and required flags are read via reflection, so repair gets the
+same shape guidance with zero schema plumbing:
+
+```csharp
+var expectation = JsonSchemaExpectation.FromType<FilePatchArguments>();
+
+// Match how the payload is actually serialized (e.g. camelCase):
+var camelCase = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+var expectation = JsonSchemaExpectation.FromType<FilePatchArguments>(camelCase);
+```
+
+`FromType` honors `[JsonPropertyName]`, `[JsonIgnore]`, and `[JsonRequired]`
+attributes, maps enums to strings, and recurses into nested objects, arrays,
+and dictionaries. Schema-guided repair is best-effort when no expectation is
+passed at all — text repair and tolerant recovery still run.
+
 ## How it works
 
 Repair runs through up to four stages:

@@ -87,6 +87,36 @@ public sealed record JsonSchemaExpectation(
         }
     }
 
+    /// <summary>
+    /// Builds an expectation from a CLR type, so callers can point the repair
+    /// pipeline at the shape a payload should deserialize into without hand-
+    /// writing a JSON Schema. Property names follow <see cref="JsonSerializerOptions"/>
+    /// naming policy unless overridden by a JSON property name attribute;
+    /// enums map to strings. Use the options overload to match how the payload is
+    /// actually serialized (e.g. a camelCase naming policy).
+    /// </summary>
+    public static JsonSchemaExpectation FromType<T>() =>
+        FromType(typeof(T));
+
+    public static JsonSchemaExpectation FromType<T>(
+        JsonSerializerOptions? options) =>
+        FromType(typeof(T), options);
+
+    public static JsonSchemaExpectation FromType(Type type) =>
+        FromType(type, null);
+
+    public static JsonSchemaExpectation FromType(
+        Type type,
+        JsonSerializerOptions? options)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+
+        return FromSchemaNode(
+            JsonSchemaFromTypeGenerator.Generate(
+                type,
+                options));
+    }
+
     public JsonSchemaExpectation? GetProperty(
         string propertyName)
     {
