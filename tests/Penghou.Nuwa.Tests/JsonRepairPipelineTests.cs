@@ -28,7 +28,6 @@ public sealed class JsonRepairPipelineTests
         var pipeline = new JsonRepairPipeline(
             strategies,
             [],
-            new TolerantJsonSyntaxTreeParser(),
             [],
             NullLogger<JsonRepairPipeline>.Instance);
 
@@ -68,7 +67,6 @@ public sealed class JsonRepairPipelineTests
         var pipeline = new JsonRepairPipeline(
             strategies,
             [],
-            new TolerantJsonSyntaxTreeParser(),
             [],
             NullLogger<JsonRepairPipeline>.Instance);
 
@@ -92,7 +90,6 @@ public sealed class JsonRepairPipelineTests
         var pipeline = new JsonRepairPipeline(
             [],
             [new SalvageRepairStrategy()],
-            new TolerantJsonSyntaxTreeParser(),
             [],
             NullLogger<JsonRepairPipeline>.Instance);
 
@@ -123,7 +120,6 @@ public sealed class JsonRepairPipelineTests
         var pipeline = new JsonRepairPipeline(
             strategies,
             [],
-            new TolerantJsonSyntaxTreeParser(),
             [],
             NullLogger<JsonRepairPipeline>.Instance);
 
@@ -148,7 +144,6 @@ public sealed class JsonRepairPipelineTests
         var pipeline = new JsonRepairPipeline(
             [],
             [new SalvageRepairStrategy(), new SalvageRepairStrategy()],
-            new TolerantJsonSyntaxTreeParser(),
             [],
             NullLogger<JsonRepairPipeline>.Instance);
 
@@ -173,7 +168,6 @@ public sealed class JsonRepairPipelineTests
         var pipeline = new JsonRepairPipeline(
             strategies,
             [],
-            new TolerantJsonSyntaxTreeParser(),
             [],
             NullLogger<JsonRepairPipeline>.Instance);
 
@@ -202,7 +196,6 @@ public sealed class JsonRepairPipelineTests
         var pipeline = new JsonRepairPipeline(
             strategies,
             [new SalvageRepairStrategy()],
-            new TolerantJsonSyntaxTreeParser(),
             [],
             NullLogger<JsonRepairPipeline>.Instance);
 
@@ -227,7 +220,6 @@ public sealed class JsonRepairPipelineTests
         var pipeline = new JsonRepairPipeline(
             [],
             [new SalvageRepairStrategy()],
-            new TolerantJsonSyntaxTreeParser(),
             [],
             logger);
 
@@ -239,6 +231,28 @@ public sealed class JsonRepairPipelineTests
                 entry.Level == LogLevel.Warning &&
                 entry.Message.Contains("salvage") &&
                 entry.Message.Contains("ms"));
+    }
+
+    [Fact]
+    public void RepairAsync_RecoveryOnlyRepair_LogsTolerantRecoveryAsWinner()
+    {
+        var logger = new CapturingLogger();
+        var pipeline = new JsonRepairPipeline(
+            [],
+            [],
+            [],
+            logger);
+
+        using var result = Repair(pipeline, """{"value":[1,2""");
+
+        result.Succeeded.Should().BeTrue();
+        result.WasRepaired.Should().BeTrue();
+        result.SucceededBy.Should().BeNull();
+        logger.Messages.Should().Contain(
+            entry =>
+                entry.Level == LogLevel.Warning &&
+                entry.Message.Contains(
+                    "Winner: tolerant-recovery"));
     }
 
     private static JsonRepairResult Repair(

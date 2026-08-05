@@ -2,7 +2,7 @@
 
 namespace Penghou.Nuwa;
 
-public sealed record TolerantJsonSyntaxTreeParseResult(
+internal sealed record TolerantJsonSyntaxTreeParseResult(
     JsonNode? Root,
     string Outcome)
 {

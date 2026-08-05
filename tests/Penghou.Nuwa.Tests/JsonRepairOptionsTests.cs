@@ -177,6 +177,34 @@ public sealed class JsonRepairOptionsTests
         act.Should().Throw<InvalidOperationException>();
     }
 
+    [Fact]
+    public void AddTextRepair_WithNoPublicConstructor_Throws()
+    {
+        var act = () => JsonRepairPipeline.Create(
+            options => options.AddTextRepair<NoPublicCtorRepair>());
+
+        act.Should().Throw<InvalidOperationException>()
+            .Which.Message.Should().Contain(
+                "no public constructor");
+    }
+
+    private sealed class NoPublicCtorRepair
+        : ITextRepair
+    {
+        private NoPublicCtorRepair()
+        {
+        }
+
+        public string Name => "no-public-ctor";
+
+        public ValueTask<TextRepairAttempt> RepairAsync(
+            string input,
+            CancellationToken cancellationToken = default) =>
+            new(new TextRepairAttempt(
+                RepairOutcome.NotApplicable,
+                null));
+    }
+
     private sealed class NoopTextRepair
         : ITextRepair
     {

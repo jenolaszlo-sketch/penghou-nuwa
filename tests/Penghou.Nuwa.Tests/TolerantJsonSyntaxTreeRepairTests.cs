@@ -794,6 +794,34 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             .Be(JsonValueKind.Array);
     }
 
+    [Fact]
+    public void Repair_ExpandsDoubleSerializedArrayDuringTolerantRecovery()
+    {
+        const string input =
+            """
+            {
+              "files": "[{\"path\":\"Program.cs\",\"content\":\"app.Run();\"}]",
+              "notes": done
+            }
+            """;
+        var pipeline = CreatePipeline();
+
+        using var result = Repair(
+            pipeline,
+            input,
+            CreateEmitFilesExpectation());
+
+        result.Succeeded.Should().BeTrue();
+        result.WasRepaired.Should().BeTrue();
+        result.TolerantParse.Should().NotBeNull();
+        result.TolerantParse!.Outcome.Should().Contain(
+            "expanded double-encoded");
+        result.Document!.RootElement
+            .GetProperty("files")
+            .ValueKind.Should()
+            .Be(JsonValueKind.Array);
+    }
+
     private static JsonRepairResult Repair(
         IJsonRepairPipeline pipeline,
         string input,
@@ -802,21 +830,14 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             .GetAwaiter()
             .GetResult();
 
-    private static JsonRepairPipeline CreatePipeline()
-    {
-        var tolerantParser =
-            new TolerantJsonSyntaxTreeParser();
-
-        return new JsonRepairPipeline(
+    private static JsonRepairPipeline CreatePipeline() =>
+        new(
             [],
             [new SalvageRepairStrategy()],
-            tolerantParser,
             [
-                new SchemaGuidedJsonStringExpansionStrategy(
-                    tolerantParser)
+                new SchemaGuidedJsonStringExpansionStrategy()
             ],
             NullLogger<JsonRepairPipeline>.Instance);
-    }
 
     private static JsonSchemaExpectation
         CreateEmitFilesExpectation() =>

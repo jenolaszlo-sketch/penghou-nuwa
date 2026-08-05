@@ -134,26 +134,20 @@ public sealed class JsonRepairPipelineIntegrationTests
             .GetAwaiter()
             .GetResult();
 
-    private static JsonRepairPipeline CreateDefaultPipeline()
-    {
-        var tolerantParser = new TolerantJsonSyntaxTreeParser();
-
-        return new JsonRepairPipeline(
+    private static JsonRepairPipeline CreateDefaultPipeline() =>
+        new(
             [
                 new MarkdownJsonFenceRepairStrategy(),
                 new PseudoCSharpVerbatimStringRepairStrategy(),
                 new PseudoJavaScriptTemplateStringRepairStrategy()
             ],
             [new SalvageRepairStrategy()],
-            tolerantParser,
             [
                 new SchemaGuidedOptionalNullRemovalStrategy(),
-                new SchemaGuidedJsonStringExpansionStrategy(
-                    tolerantParser)
+                new SchemaGuidedJsonStringExpansionStrategy()
             ],
             Microsoft.Extensions.Logging.Abstractions
                 .NullLogger<JsonRepairPipeline>.Instance);
-    }
 
     private static JsonSchemaExpectation
         CreateEmitFilesExpectation() =>

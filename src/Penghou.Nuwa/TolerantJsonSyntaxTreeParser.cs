@@ -7,7 +7,7 @@ namespace Penghou.Nuwa;
 /// owns schema-aware token recovery. Text-level salvage is owned by the
 /// pipeline's ordered fallback phase and runs only when recovery fails.
 /// </summary>
-public sealed class TolerantJsonSyntaxTreeParser
+internal sealed class TolerantJsonSyntaxTreeParser
     : ITolerantJsonSyntaxTreeParser
 {
     public TolerantJsonSyntaxTreeParseResult Parse(

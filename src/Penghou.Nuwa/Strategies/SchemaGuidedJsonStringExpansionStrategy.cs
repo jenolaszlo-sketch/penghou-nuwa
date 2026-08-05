@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Nodes;
+﻿using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Penghou.Nuwa.Strategies;
 
@@ -8,8 +9,7 @@ namespace Penghou.Nuwa.Strategies;
 /// and array expectations are expanded; scalar coercion is deliberately
 /// avoided because it can silently change model intent.
 /// </summary>
-public sealed class SchemaGuidedJsonStringExpansionStrategy(
-    ITolerantJsonSyntaxTreeParser tolerantParser)
+public sealed class SchemaGuidedJsonStringExpansionStrategy
     : INodeRepair
 {
     public string Name => "schema-guided-json-string-expansion";
@@ -45,16 +45,14 @@ public sealed class SchemaGuidedJsonStringExpansionStrategy(
         if (ShouldExpand(expectation.ExpectedKind) &&
             TryGetString(node, out var encoded))
         {
-            var parsed = tolerantParser.Parse(
-                encoded,
-                expectation);
+            var parsed = TryParseNode(encoded);
 
-            if (parsed.Root is not null &&
+            if (parsed is not null &&
                 MatchesExpectedKind(
-                    parsed.Root,
+                    parsed,
                     expectation.ExpectedKind))
             {
-                node = parsed.Root;
+                node = parsed;
                 changed = true;
             }
         }
@@ -151,5 +149,18 @@ public sealed class SchemaGuidedJsonStringExpansionStrategy(
 
         value = parsed;
         return true;
+    }
+
+    private static JsonNode? TryParseNode(
+        string json)
+    {
+        try
+        {
+            return JsonNode.Parse(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 }

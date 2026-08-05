@@ -33,10 +33,6 @@ public static class ServiceCollectionExtensions
             services.AddSingleton(type);
         }
 
-        services.AddSingleton<
-            ITolerantJsonSyntaxTreeParser,
-            TolerantJsonSyntaxTreeParser>();
-
         services.AddSingleton<IJsonRepairPipeline>(
             serviceProvider =>
             {
@@ -56,8 +52,6 @@ public static class ServiceCollectionExtensions
                 return new JsonRepairPipeline(
                     textRepairs,
                     salvageRepairs,
-                    serviceProvider.GetRequiredService<
-                        ITolerantJsonSyntaxTreeParser>(),
                     nodeRepairs,
                     serviceProvider.GetRequiredService<
                         ILogger<JsonRepairPipeline>>());

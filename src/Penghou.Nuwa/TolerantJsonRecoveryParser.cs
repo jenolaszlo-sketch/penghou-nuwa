@@ -80,6 +80,43 @@ internal sealed class TolerantJsonRecoveryParser(
                 schemaGuided: true);
         }
 
+        if ((currentExpectation?.ExpectedKind ==
+                 JsonSchemaFieldKind.Array ||
+             currentExpectation?.ExpectedKind ==
+                 JsonSchemaFieldKind.Object) &&
+            token.Kind is
+                JsonTokenKind.Quote or
+                JsonTokenKind.SingleQuote)
+        {
+            var stringResult =
+                token.Kind == JsonTokenKind.Quote
+                    ? ParseString(
+                        hasOpeningQuote: true,
+                        schemaGuided: false)
+                    : ParseSingleQuotedString();
+
+            if (stringResult.Succeeded &&
+                TryGetStringNode(
+                    stringResult.Node,
+                    out var innerText))
+            {
+                var expanded =
+                    ExpandContainerFromString(
+                        innerText,
+                        currentExpectation);
+
+                if (expanded is not null)
+                {
+                    Record(
+                        token.Start,
+                        "expanded double-encoded JSON string into a schema-matching value");
+                    return NodeResult.Success(expanded);
+                }
+            }
+
+            return stringResult;
+        }
+
         return token.Kind switch
         {
             JsonTokenKind.ObjectStart =>
@@ -734,6 +771,64 @@ internal sealed class TolerantJsonRecoveryParser(
 
         target.Append("\\u");
     }
+
+    private JsonNode? ExpandContainerFromString(
+        string innerText,
+        JsonSchemaExpectation expectation)
+    {
+        var childExpectation =
+            expectation.ExpectedKind ==
+            JsonSchemaFieldKind.Array
+                ? expectation.GetItem()
+                : expectation;
+
+        var recovery =
+            new TolerantJsonRecoveryParser(
+                    innerText,
+                    childExpectation)
+                .Parse();
+
+        if (recovery.Root is null ||
+            !MatchesContainerKind(
+                recovery.Root,
+                expectation.ExpectedKind))
+        {
+            return null;
+        }
+
+        _schemaStringRepairCount++;
+        return recovery.Root;
+    }
+
+    private static bool TryGetStringNode(
+        JsonNode? node,
+        out string value)
+    {
+        value = string.Empty;
+
+        if (node is not JsonValue jsonValue ||
+            !jsonValue.TryGetValue<string>(
+                out var parsed) ||
+            parsed is null)
+        {
+            return false;
+        }
+
+        value = parsed;
+        return true;
+    }
+
+    private static bool MatchesContainerKind(
+        JsonNode node,
+        JsonSchemaFieldKind? kind) =>
+        kind switch
+        {
+            JsonSchemaFieldKind.Array =>
+                node is JsonArray,
+            JsonSchemaFieldKind.Object =>
+                node is JsonObject,
+            _ => false
+        };
 
     private bool ShouldRecoverRawString(
         JsonToken token)

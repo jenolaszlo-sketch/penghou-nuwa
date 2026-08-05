@@ -1,4 +1,5 @@
 using Penghou.Nuwa.Strategies;
+using System.Reflection;
 
 namespace Penghou.Nuwa;
 
@@ -121,6 +122,9 @@ public sealed class JsonRepairOptions
         ValidateNoDuplicates(_textRepairs, "text repair");
         ValidateNoDuplicates(_salvageRepairs, "salvage repair");
         ValidateNoDuplicates(_nodeRepairs, "node repair");
+        ValidateStrategies(_textRepairs, typeof(ITextRepair), "text repair");
+        ValidateStrategies(_salvageRepairs, typeof(ITextRepair), "salvage repair");
+        ValidateStrategies(_nodeRepairs, typeof(INodeRepair), "node repair");
     }
 
     private static void InsertAfter(
@@ -155,6 +159,31 @@ public sealed class JsonRepairOptions
         {
             throw new InvalidOperationException(
                 $"The {label} '{type.Name}' is not registered.");
+        }
+    }
+
+    private static void ValidateStrategies(
+        IReadOnlyList<Type> types,
+        Type requiredInterface,
+        string label)
+    {
+        foreach (var type in types)
+        {
+            if (!requiredInterface.IsAssignableFrom(type))
+            {
+                throw new InvalidOperationException(
+                    $"The {label} '{type.Name}' does not implement '{requiredInterface.Name}'.");
+            }
+
+            if (!type
+                    .GetConstructors(
+                        BindingFlags.Instance |
+                        BindingFlags.Public)
+                    .Any())
+            {
+                throw new InvalidOperationException(
+                    $"The {label} '{type.Name}' has no public constructor and cannot be created. Register it with AddJsonRepair(Action<JsonRepairOptions>) using a public-constructor type instead.");
+            }
         }
     }
 

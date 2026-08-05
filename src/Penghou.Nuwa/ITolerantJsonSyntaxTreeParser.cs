@@ -1,6 +1,6 @@
 ﻿namespace Penghou.Nuwa;
 
-public interface ITolerantJsonSyntaxTreeParser
+internal interface ITolerantJsonSyntaxTreeParser
 {
     TolerantJsonSyntaxTreeParseResult Parse(
         string input,

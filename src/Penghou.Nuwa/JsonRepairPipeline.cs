@@ -8,20 +8,33 @@ using System.Text.Json.Nodes;
 
 namespace Penghou.Nuwa;
 
-public sealed class JsonRepairPipeline(
-    IReadOnlyList<ITextRepair> textRepairs,
-    IReadOnlyList<ITextRepair> salvageRepairs,
-    ITolerantJsonSyntaxTreeParser tolerantParser,
-    IReadOnlyList<INodeRepair> nodeRepairs,
-    ILogger<JsonRepairPipeline> logger)
+public sealed class JsonRepairPipeline
     : IJsonRepairPipeline
 {
+    private readonly IReadOnlyList<ITextRepair> _textRepairs;
+    private readonly IReadOnlyList<ITextRepair> _salvageRepairs;
+    private readonly IReadOnlyList<INodeRepair> _nodeRepairs;
+    private readonly ILogger<JsonRepairPipeline> _logger;
+    private readonly TolerantJsonSyntaxTreeParser _tolerantParser =
+        new();
+
+    public JsonRepairPipeline(
+        IReadOnlyList<ITextRepair> textRepairs,
+        IReadOnlyList<ITextRepair> salvageRepairs,
+        IReadOnlyList<INodeRepair> nodeRepairs,
+        ILogger<JsonRepairPipeline> logger)
+    {
+        _textRepairs = textRepairs;
+        _salvageRepairs = salvageRepairs;
+        _nodeRepairs = nodeRepairs;
+        _logger = logger;
+    }
+
     /// <summary>
     /// Builds a ready-to-use pipeline without a service collection. Strategies
     /// are resolved through public constructors whose parameters are
-    /// satisfiable by the pipeline's parser or a null logger; strategies with
-    /// other dependencies should be registered with
-    /// <c>AddJsonRepair</c> instead.
+    /// satisfiable with a null logger; strategies with other dependencies
+    /// should be registered with <c>AddJsonRepair</c> instead.
     /// </summary>
     public static JsonRepairPipeline Create(
         Action<JsonRepairOptions>? configure = null)
@@ -30,19 +43,13 @@ public sealed class JsonRepairPipeline(
         configure?.Invoke(options);
         options.Validate();
 
-        var parser = new TolerantJsonSyntaxTreeParser();
-
         return new JsonRepairPipeline(
             Instantiate<ITextRepair>(
-                options.TextRepairs,
-                parser),
+                options.TextRepairs),
             Instantiate<ITextRepair>(
-                options.SalvageRepairs,
-                parser),
-            parser,
+                options.SalvageRepairs),
             Instantiate<INodeRepair>(
-                options.NodeRepairs,
-                parser),
+                options.NodeRepairs),
             NullLogger<JsonRepairPipeline>.Instance);
     }
 
@@ -79,8 +86,8 @@ public sealed class JsonRepairPipeline(
         // Already valid JSON: no text repair needed.
         if (TryParseNode(current, out var root))
         {
-            ReportSkipped(textReports, textRepairs);
-            ReportSkipped(textReports, salvageRepairs);
+            ReportSkipped(textReports, _textRepairs);
+            ReportSkipped(textReports, _salvageRepairs);
 
             return await CreateResultAsync(
                 root!,
@@ -95,9 +102,9 @@ public sealed class JsonRepairPipeline(
         // Ordered text-repair phase.
         var successIndex = -1;
 
-        for (var index = 0; index < textRepairs.Count; index++)
+        for (var index = 0; index < _textRepairs.Count; index++)
         {
-            var strategy = textRepairs[index];
+            var strategy = _textRepairs[index];
             var repair = await TryRepairAsync(
                 strategy,
                 current,
@@ -113,37 +120,19 @@ public sealed class JsonRepairPipeline(
             }
 
             var attempt = repair.Attempt;
-
-            if (attempt.Outcome == RepairOutcome.NotApplicable)
-            {
-                textReports.Add(new StrategyReport(
-                    strategy.Name,
-                    StrategyStatus.NotApplicable,
-                    Note: attempt.Note));
-                continue;
-            }
-
-            if (attempt.Outcome == RepairOutcome.Failed ||
-                string.IsNullOrWhiteSpace(attempt.Repaired) ||
-                string.Equals(
-                    attempt.Repaired,
-                    current,
-                    StringComparison.Ordinal))
-            {
-                textReports.Add(new StrategyReport(
-                    strategy.Name,
-                    StrategyStatus.Failed,
-                    Note: attempt.Note));
-                continue;
-            }
-
-            current = attempt.Repaired;
-            textWasRepaired = true;
-            textReports.Add(new StrategyReport(
+            var report = ReportTextAttempt(
                 strategy.Name,
-                StrategyStatus.Succeeded,
-                current,
-                attempt.Note));
+                attempt,
+                current);
+            textReports.Add(report);
+
+            if (report.Status != StrategyStatus.Succeeded)
+            {
+                continue;
+            }
+
+            current = attempt.Repaired!;
+            textWasRepaired = true;
 
             if (TryParseNode(current, out root))
             {
@@ -155,15 +144,15 @@ public sealed class JsonRepairPipeline(
         if (successIndex >= 0)
         {
             for (var index = successIndex + 1;
-                 index < textRepairs.Count;
+                 index < _textRepairs.Count;
                  index++)
             {
                 textReports.Add(new StrategyReport(
-                    textRepairs[index].Name,
+                    _textRepairs[index].Name,
                     StrategyStatus.Skipped));
             }
 
-            ReportSkipped(textReports, salvageRepairs);
+            ReportSkipped(textReports, _salvageRepairs);
 
             return await CreateResultAsync(
                 root!,
@@ -177,7 +166,7 @@ public sealed class JsonRepairPipeline(
 
         // Tolerant recovery, then the ordered salvage fallback phase.
         var tolerantParse =
-            tolerantParser.Parse(
+            _tolerantParser.Parse(
                 current,
                 expectation);
 
@@ -185,9 +174,9 @@ public sealed class JsonRepairPipeline(
         {
             var salvageSuccessIndex = -1;
 
-            for (var index = 0; index < salvageRepairs.Count; index++)
+            for (var index = 0; index < _salvageRepairs.Count; index++)
             {
-                var strategy = salvageRepairs[index];
+                var strategy = _salvageRepairs[index];
                 var repair = await TryRepairAsync(
                     strategy,
                     current,
@@ -203,40 +192,22 @@ public sealed class JsonRepairPipeline(
                 }
 
                 var attempt = repair.Attempt;
-
-                if (attempt.Outcome == RepairOutcome.NotApplicable)
-                {
-                    textReports.Add(new StrategyReport(
-                        strategy.Name,
-                        StrategyStatus.NotApplicable,
-                        Note: attempt.Note));
-                    continue;
-                }
-
-                if (attempt.Outcome == RepairOutcome.Failed ||
-                    string.IsNullOrWhiteSpace(attempt.Repaired) ||
-                    string.Equals(
-                        attempt.Repaired,
-                        current,
-                        StringComparison.Ordinal))
-                {
-                    textReports.Add(new StrategyReport(
-                        strategy.Name,
-                        StrategyStatus.Failed,
-                        Note: attempt.Note));
-                    continue;
-                }
-
-                current = attempt.Repaired;
-                textWasRepaired = true;
-                textReports.Add(new StrategyReport(
+                var report = ReportTextAttempt(
                     strategy.Name,
-                    StrategyStatus.Succeeded,
-                    current,
-                    attempt.Note));
+                    attempt,
+                    current);
+                textReports.Add(report);
+
+                if (report.Status != StrategyStatus.Succeeded)
+                {
+                    continue;
+                }
+
+                current = attempt.Repaired!;
+                textWasRepaired = true;
 
                 tolerantParse =
-                    tolerantParser.Parse(
+                    _tolerantParser.Parse(
                         current,
                         expectation);
 
@@ -250,11 +221,11 @@ public sealed class JsonRepairPipeline(
             if (salvageSuccessIndex >= 0)
             {
                 for (var index = salvageSuccessIndex + 1;
-                     index < salvageRepairs.Count;
+                     index < _salvageRepairs.Count;
                      index++)
                 {
                     textReports.Add(new StrategyReport(
-                        salvageRepairs[index].Name,
+                        _salvageRepairs[index].Name,
                         StrategyStatus.Skipped));
                 }
             }
@@ -262,7 +233,7 @@ public sealed class JsonRepairPipeline(
         else
         {
             // Recovery succeeded directly; salvage never ran.
-            ReportSkipped(textReports, salvageRepairs);
+            ReportSkipped(textReports, _salvageRepairs);
         }
 
         if (tolerantParse.Root is null)
@@ -302,7 +273,7 @@ public sealed class JsonRepairPipeline(
         var nodeWasRepaired = false;
         if (expectation is not null)
         {
-            foreach (var strategy in nodeRepairs)
+            foreach (var strategy in _nodeRepairs)
             {
                 NodeRepairAttempt attempt;
 
@@ -322,31 +293,18 @@ public sealed class JsonRepairPipeline(
                     continue;
                 }
 
-                if (attempt.Outcome == RepairOutcome.NotApplicable)
-                {
-                    nodeReports.Add(new StrategyReport(
-                        strategy.Name,
-                        StrategyStatus.NotApplicable,
-                        Note: attempt.Note));
-                    continue;
-                }
-
-                if (attempt.Outcome == RepairOutcome.Failed ||
-                    attempt.Repaired is null)
-                {
-                    nodeReports.Add(new StrategyReport(
-                        strategy.Name,
-                        StrategyStatus.Failed,
-                        Note: attempt.Note));
-                    continue;
-                }
-
-                current = attempt.Repaired;
-                nodeWasRepaired = true;
-                nodeReports.Add(new StrategyReport(
+                var report = ReportNodeAttempt(
                     strategy.Name,
-                    StrategyStatus.Succeeded,
-                    Note: attempt.Note));
+                    attempt);
+                nodeReports.Add(report);
+
+                if (report.Status != StrategyStatus.Succeeded)
+                {
+                    continue;
+                }
+
+                current = attempt.Repaired!;
+                nodeWasRepaired = true;
             }
         }
 
@@ -373,7 +331,7 @@ public sealed class JsonRepairPipeline(
     {
         if (!result.Succeeded)
         {
-            logger.LogWarning(
+            _logger.LogWarning(
                 "Malformed JSON could not be repaired in {ElapsedMilliseconds} ms. Text repairs: {@TextRepairs}.",
                 elapsedMilliseconds,
                 result.TextRepairs);
@@ -382,15 +340,16 @@ public sealed class JsonRepairPipeline(
 
         if (result.WasRepaired)
         {
-            logger.LogWarning(
+            _logger.LogWarning(
                 "Malformed JSON was repaired in {ElapsedMilliseconds} ms. Winner: {Winner}. Text repairs: {@TextRepairs}.",
                 elapsedMilliseconds,
-                result.SucceededBy?.Name,
+                result.SucceededBy?.Name ??
+                    "tolerant-recovery",
                 result.TextRepairs);
         }
         else
         {
-            logger.LogDebug(
+            _logger.LogDebug(
                 "JSON parsed without repair in {ElapsedMilliseconds} ms.",
                 elapsedMilliseconds);
         }
@@ -406,6 +365,66 @@ public sealed class JsonRepairPipeline(
                 strategy.Name,
                 StrategyStatus.Skipped));
         }
+    }
+
+    private static StrategyReport ReportTextAttempt(
+        string name,
+        TextRepairAttempt attempt,
+        string current)
+    {
+        if (attempt.Outcome == RepairOutcome.NotApplicable)
+        {
+            return new StrategyReport(
+                name,
+                StrategyStatus.NotApplicable,
+                Note: attempt.Note);
+        }
+
+        if (attempt.Outcome == RepairOutcome.Failed ||
+            string.IsNullOrWhiteSpace(attempt.Repaired) ||
+            string.Equals(
+                attempt.Repaired,
+                current,
+                StringComparison.Ordinal))
+        {
+            return new StrategyReport(
+                name,
+                StrategyStatus.Failed,
+                Note: attempt.Note);
+        }
+
+        return new StrategyReport(
+            name,
+            StrategyStatus.Succeeded,
+            attempt.Repaired,
+            attempt.Note);
+    }
+
+    private static StrategyReport ReportNodeAttempt(
+        string name,
+        NodeRepairAttempt attempt)
+    {
+        if (attempt.Outcome == RepairOutcome.NotApplicable)
+        {
+            return new StrategyReport(
+                name,
+                StrategyStatus.NotApplicable,
+                Note: attempt.Note);
+        }
+
+        if (attempt.Outcome == RepairOutcome.Failed ||
+            attempt.Repaired is null)
+        {
+            return new StrategyReport(
+                name,
+                StrategyStatus.Failed,
+                Note: attempt.Note);
+        }
+
+        return new StrategyReport(
+            name,
+            StrategyStatus.Succeeded,
+            Note: attempt.Note);
     }
 
     private static async ValueTask<RepairResult> TryRepairAsync(
@@ -430,8 +449,7 @@ public sealed class JsonRepairPipeline(
     }
 
     private static IReadOnlyList<T> Instantiate<T>(
-        IReadOnlyList<Type> types,
-        ITolerantJsonSyntaxTreeParser parser)
+        IReadOnlyList<Type> types)
         where T : class
     {
         var repairs = new T[types.Count];
@@ -439,16 +457,14 @@ public sealed class JsonRepairPipeline(
         for (var index = 0; index < types.Count; index++)
         {
             repairs[index] = Instantiate<T>(
-                types[index],
-                parser);
+                types[index]);
         }
 
         return repairs;
     }
 
     private static T Instantiate<T>(
-        Type type,
-        ITolerantJsonSyntaxTreeParser parser)
+        Type type)
         where T : class
     {
         var constructor = type
@@ -469,8 +485,7 @@ public sealed class JsonRepairPipeline(
         {
             arguments[index] = ResolveConstructorArgument(
                 type,
-                parameters[index],
-                parser);
+                parameters[index]);
         }
 
         var repair = Activator.CreateInstance(type, arguments)
@@ -482,16 +497,9 @@ public sealed class JsonRepairPipeline(
 
     private static object? ResolveConstructorArgument(
         Type strategyType,
-        ParameterInfo parameter,
-        ITolerantJsonSyntaxTreeParser parser)
+        ParameterInfo parameter)
     {
         var parameterType = parameter.ParameterType;
-
-        if (parameterType.IsAssignableFrom(
-            parser.GetType()))
-        {
-            return parser;
-        }
 
         if (parameterType == typeof(ILoggerFactory))
         {
