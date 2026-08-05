@@ -2,7 +2,8 @@
 
 public interface IJsonRepairPipeline
 {
-    JsonRepairResult Repair(
+    ValueTask<JsonRepairResult> RepairAsync(
         string input,
-        JsonSchemaExpectation? expectation = null);
+        JsonSchemaExpectation? expectation = null,
+        CancellationToken cancellationToken = default);
 }

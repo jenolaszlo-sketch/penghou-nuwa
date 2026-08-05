@@ -10,24 +10,29 @@ namespace Penghou.Nuwa.Strategies;
 /// </summary>
 public sealed class SchemaGuidedJsonStringExpansionStrategy(
     ITolerantJsonSyntaxTreeParser tolerantParser)
-    : INodeRepairStrategy
+    : INodeRepair
 {
     public string Name => "schema-guided-json-string-expansion";
 
-    public bool TryRepair(
+    public ValueTask<NodeRepairAttempt> RepairAsync(
         JsonNode node,
         JsonSchemaExpectation expectation,
-        out JsonNode repaired)
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(expectation);
 
-        repaired = RepairNode(
+        var repaired = RepairNode(
             node.DeepClone(),
             expectation,
             out var changed);
 
-        return changed;
+        return new(new NodeRepairAttempt(
+            changed
+                ? RepairOutcome.Repaired
+                : RepairOutcome.NotApplicable,
+            changed ? repaired : null));
     }
 
     private JsonNode RepairNode(

@@ -9,15 +9,35 @@ namespace Penghou.Nuwa.Strategies;
 /// files even though backticks are not valid JSON.
 /// </summary>
 public sealed class PseudoJavaScriptTemplateStringRepairStrategy
-    : ITextRepairStrategy
+    : ITextRepair
 {
     public string Name =>
         "pseudo-javascript-template-string";
 
-    public bool MightApply(string text) =>
-        text.Contains('`');
+    public ValueTask<TextRepairAttempt> RepairAsync(
+        string input,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
 
-    public bool TryRepair(
+        if (string.IsNullOrWhiteSpace(input) ||
+            !input.Contains('`'))
+        {
+            return new(new TextRepairAttempt(
+                RepairOutcome.NotApplicable,
+                null));
+        }
+
+        var changed = TryRepair(input, out var repaired);
+
+        return new(new TextRepairAttempt(
+            changed
+                ? RepairOutcome.Repaired
+                : RepairOutcome.NotApplicable,
+            changed ? repaired : null));
+    }
+
+    private static bool TryRepair(
         string input,
         out string repaired)
     {

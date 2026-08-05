@@ -16,16 +16,35 @@ namespace Penghou.Nuwa.Strategies;
 /// repair the JSON contained inside the fence.
 /// </summary>
 public sealed class MarkdownJsonFenceRepairStrategy
-    : ITextRepairStrategy
+    : ITextRepair
 {
     public string Name => "markdown-json-fence";
 
-    public bool MightApply(string text)
+    public ValueTask<TextRepairAttempt> RepairAsync(
+        string input,
+        CancellationToken cancellationToken = default)
     {
-        return text.Contains("```", StringComparison.Ordinal);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(input) ||
+            (!input.Contains("```", StringComparison.Ordinal) &&
+             !input.Contains("~~~", StringComparison.Ordinal)))
+        {
+            return new(new TextRepairAttempt(
+                RepairOutcome.NotApplicable,
+                null));
+        }
+
+        var changed = TryRepair(input, out var repaired);
+
+        return new(new TextRepairAttempt(
+            changed
+                ? RepairOutcome.Repaired
+                : RepairOutcome.NotApplicable,
+            changed ? repaired : null));
     }
 
-    public bool TryRepair(
+    private static bool TryRepair(
         string input,
         out string repaired)
     {

@@ -16,23 +16,23 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategyTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void TryRepair_NullOrWhitespaceInput_ReturnsFalseAndEchoesInput(string? input)
+    public void RepairAsync_NullOrWhitespaceInput_ReturnsNotApplicable(string? input)
     {
-        var result = _sut.TryRepair(input!, out var repaired);
+        var attempt = Repair(_sut, input!);
 
-        result.Should().BeFalse();
-        repaired.Should().Be(input);
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.NotApplicable);
     }
 
     [Fact]
-    public void TryRepair_NoVerbatimLiteral_ReturnsFalseAndLeavesInputUnchanged()
+    public void RepairAsync_NoVerbatimLiteral_ReturnsNotApplicable()
     {
         const string input = """{"name": "emit_files", "arguments": {"content": "already fine"}}""";
 
-        var result = _sut.TryRepair(input, out var repaired);
+        var attempt = Repair(_sut, input);
 
-        result.Should().BeFalse();
-        repaired.Should().Be(input);
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.NotApplicable);
     }
 
     // ---------------------------------------------------------------
@@ -40,13 +40,15 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategyTests
     // ---------------------------------------------------------------
 
     [Fact]
-    public void TryRepair_SingleVerbatimLiteral_NoOtherDefects_ProducesFullyValidJson()
+    public void RepairAsync_SingleVerbatimLiteral_NoOtherDefects_ProducesFullyValidJson()
     {
         const string input = "{\"content\": @\"line1\nline2\"}";
 
-        var result = _sut.TryRepair(input, out var repaired);
+        var attempt = Repair(_sut, input);
+        var repaired = attempt.Repaired!;
 
-        result.Should().BeTrue();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired);
         repaired.Should().NotContain("@\"");
 
         var act = () => JsonDocument.Parse(repaired);
@@ -57,14 +59,16 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategyTests
     }
 
     [Fact]
-    public void TryRepair_DoubledInnerQuotes_AreNormalizedToSingleEscapedQuotes()
+    public void RepairAsync_DoubledInnerQuotes_AreNormalizedToSingleEscapedQuotes()
     {
         // Real C# verbatim escaping ("") for an embedded quote, partially applied by the model.
         const string input = "{\"content\": @\"Console.WriteLine(\"\"Hello, World!\"\");\"}";
 
-        var result = _sut.TryRepair(input, out var repaired);
+        var attempt = Repair(_sut, input);
+        var repaired = attempt.Repaired!;
 
-        result.Should().BeTrue();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired);
 
         using var doc = JsonDocument.Parse(repaired);
         doc.RootElement.GetProperty("content").GetString()
@@ -82,13 +86,15 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategyTests
     // ---------------------------------------------------------------
 
     [Fact]
-    public void TryRepair_PrefersNearestTerminator_OverFartherOneThatAlsoParses()
+    public void RepairAsync_PrefersNearestTerminator_OverFartherOneThatAlsoParses()
     {
         const string input = "{\"content\": @\"hello\", \"notes\": \"world\"}";
 
-        var result = _sut.TryRepair(input, out var repaired);
+        var attempt = Repair(_sut, input);
+        var repaired = attempt.Repaired!;
 
-        result.Should().BeTrue();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired);
 
         using var doc = JsonDocument.Parse(repaired);
         doc.RootElement.GetProperty("content").GetString().Should().Be("hello");
@@ -102,7 +108,7 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategyTests
     // Partial fix: verbatim string converted correctly, but a separate
     // structural defect (missing closing bracket) elsewhere means the
     // result can never be made fully valid by this strategy alone.
-    // Per the ITextRepairStrategy contract, this must still report
+    // Per the ITextRepair contract, this must still report
     // "changed" so the tolerant syntax-tree parser gets a chance downstream —
     // it must NOT discard the conversion just because full validity
     // wasn't reached.
@@ -116,7 +122,7 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategyTests
         "            Console.WriteLine(\"Hello, World!\");\n        }\n    }\n}";
 
     [Fact]
-    public void TryRepair_VerbatimLiteralWithUnrelatedStructuralDefect_StillConvertsAndReportsChanged()
+    public void RepairAsync_VerbatimLiteralWithUnrelatedStructuralDefect_StillConvertsAndReportsChanged()
     {
         var csharpVerbatimSource = StructuralDefectSourceContent.Replace("\"", "\"\"");
 
@@ -125,10 +131,13 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategyTests
             "\"content\": @\"" + csharpVerbatimSource + "\"}, " +
             "\"notes\": \"Generated a C# file with a HelloWorld class and a Main method.\"}}";
 
-        var result = _sut.TryRepair(input, out var repaired);
+        var attempt = Repair(_sut, input);
+        var repaired = attempt.Repaired!;
 
-        result.Should().BeTrue("the strategy converted the verbatim string, which counts as a change" +
-                                " even though the missing ']' elsewhere means full validity isn't reached yet");
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired,
+                "the strategy converted the verbatim string, which counts as a change" +
+                " even though the missing ']' elsewhere means full validity isn't reached yet");
 
         repaired.Should().NotContain("@\"");
 
@@ -144,7 +153,7 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategyTests
     }
 
     [Fact]
-    public void TryRepair_VerbatimLiteralWithUnrelatedStructuralDefect_DoesNotInsertOrRemoveWhitespace()
+    public void RepairAsync_VerbatimLiteralWithUnrelatedStructuralDefect_DoesNotInsertOrRemoveWhitespace()
     {
         var csharpVerbatimSource = StructuralDefectSourceContent.Replace("\"", "\"\"");
 
@@ -156,7 +165,7 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategyTests
         // short-circuiting past the correct nearer match.
         var input = "{\"content\": @\"" + csharpVerbatimSource + "\", \"extra\": \"trailing\"";
 
-        _sut.TryRepair(input, out var repaired);
+        var repaired = Repair(_sut, input).Repaired!;
 
         // Guard against accidental reformatting (e.g. inserted/removed line breaks) creeping
         // into generated source content during repair — the pipeline must be byte-faithful.
@@ -171,13 +180,15 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategyTests
     // ---------------------------------------------------------------
 
     [Fact]
-    public void TryRepair_MultipleVerbatimLiterals_BothConverted_WhenResultIsOtherwiseValid()
+    public void RepairAsync_MultipleVerbatimLiterals_BothConverted_WhenResultIsOtherwiseValid()
     {
         const string input = "{\"files\": [{\"content\": @\"first\"}, {\"content\": @\"second\"}]}";
 
-        var result = _sut.TryRepair(input, out var repaired);
+        var attempt = Repair(_sut, input);
+        var repaired = attempt.Repaired!;
 
-        result.Should().BeTrue();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired);
         repaired.Should().NotContain("@\"");
 
         using var doc = JsonDocument.Parse(repaired);
@@ -193,12 +204,17 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategyTests
     // ---------------------------------------------------------------
 
     [Fact]
-    public void TryRepair_ManyUnterminatedLookingLiterals_DoesNotThrowOrHang()
+    public void RepairAsync_ManyUnterminatedLookingLiterals_DoesNotThrowOrHang()
     {
         var input = "{\"content\": " + string.Concat(Enumerable.Repeat("@\"x", 100)) + "\"}";
 
-        var act = () => _sut.TryRepair(input, out _);
+        var act = () => Repair(_sut, input);
 
         act.Should().NotThrow();
     }
+
+    private static TextRepairAttempt Repair(
+        ITextRepair strategy,
+        string input) =>
+        strategy.RepairAsync(input).GetAwaiter().GetResult();
 }

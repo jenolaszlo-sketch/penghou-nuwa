@@ -12,7 +12,7 @@ public sealed class
         _strategy = new();
 
     [Fact]
-    public void TryRepair_ConvertsMultilineTemplateValue()
+    public void RepairAsync_ConvertsMultilineTemplateValue()
     {
         const string input =
             """
@@ -24,11 +24,11 @@ public sealed class
             }
             """;
 
-        var changed = _strategy.TryRepair(
-            input,
-            out var repaired);
+        var attempt = Repair(_strategy, input);
+        var repaired = attempt.Repaired!;
 
-        changed.Should().BeTrue();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired);
         using var document =
             JsonDocument.Parse(repaired);
         document.RootElement
@@ -39,7 +39,7 @@ public sealed class
     }
 
     [Fact]
-    public void TryRepair_ConvertsMultipleTemplateValues()
+    public void RepairAsync_ConvertsMultipleTemplateValues()
     {
         const string input =
             """
@@ -50,11 +50,11 @@ public sealed class
             }
             """;
 
-        var changed = _strategy.TryRepair(
-            input,
-            out var repaired);
+        var attempt = Repair(_strategy, input);
+        var repaired = attempt.Repaired!;
 
-        changed.Should().BeTrue();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired);
         using var document =
             JsonDocument.Parse(repaired);
         document.RootElement
@@ -70,16 +70,16 @@ public sealed class
     }
 
     [Fact]
-    public void TryRepair_DecodesEscapedBacktick()
+    public void RepairAsync_DecodesEscapedBacktick()
     {
         const string input =
             """{"content": `value \`inside\` content`}""";
 
-        var changed = _strategy.TryRepair(
-            input,
-            out var repaired);
+        var attempt = Repair(_strategy, input);
+        var repaired = attempt.Repaired!;
 
-        changed.Should().BeTrue();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired);
         using var document =
             JsonDocument.Parse(repaired);
         document.RootElement
@@ -90,32 +90,36 @@ public sealed class
     }
 
     [Fact]
-    public void TryRepair_DoesNotChangeBackticksInsideJsonString()
+    public void RepairAsync_DoesNotChangeBackticksInsideJsonString()
     {
         const string input =
             """{"content":"use `code` here"}""";
 
-        var changed = _strategy.TryRepair(
-            input,
-            out var repaired);
+        var attempt = Repair(_strategy, input);
 
-        changed.Should().BeFalse();
-        repaired.Should().Be(input);
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.NotApplicable);
+        attempt.Repaired.Should().BeNull();
     }
 
     [Fact]
-    public void TryRepair_LeavesStructuralDamageForParser()
+    public void RepairAsync_LeavesStructuralDamageForParser()
     {
         const string input =
             """{"files":[{"content":`app.Run();`}]""";
 
-        var changed = _strategy.TryRepair(
-            input,
-            out var repaired);
+        var attempt = Repair(_strategy, input);
+        var repaired = attempt.Repaired!;
 
-        changed.Should().BeTrue();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired);
         repaired.Should().Contain(
             "\"content\":\"app.Run();\"");
         repaired.Should().EndWith("}]");
     }
+
+    private static TextRepairAttempt Repair(
+        ITextRepair strategy,
+        string input) =>
+        strategy.RepairAsync(input).GetAwaiter().GetResult();
 }

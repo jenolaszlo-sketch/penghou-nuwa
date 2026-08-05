@@ -7,7 +7,7 @@ namespace Penghou.Nuwa.Tests.Strategies;
 public sealed class SchemaGuidedOptionalNullRemovalStrategyTests
 {
     [Fact]
-    public void TryRepair_RemovesNestedOptionalNullRejectedBySchema()
+    public void RepairAsync_RemovesNestedOptionalNullRejectedBySchema()
     {
         var node = JsonNode.Parse(
             """
@@ -38,17 +38,21 @@ public sealed class SchemaGuidedOptionalNullRemovalStrategyTests
             }
             """)!;
 
-        var changed = new SchemaGuidedOptionalNullRemovalStrategy()
-            .TryRepair(node, expectation, out var repaired);
+        var attempt = Repair(
+            new SchemaGuidedOptionalNullRemovalStrategy(),
+            node,
+            expectation);
+        var repaired = attempt.Repaired!;
 
-        changed.Should().BeTrue();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired);
         repaired["taskReplacements"]![0]!.AsObject()
             .ContainsKey("moduleId").Should().BeFalse();
         expectation.Validate(repaired).Should().BeEmpty();
     }
 
     [Fact]
-    public void TryRepair_PreservesRequiredNull()
+    public void RepairAsync_PreservesRequiredNull()
     {
         var node = JsonNode.Parse("""{"value":null}""")!;
         var expectation = JsonSchemaExpectation.FromSchemaJson(
@@ -60,16 +64,19 @@ public sealed class SchemaGuidedOptionalNullRemovalStrategyTests
             }
             """)!;
 
-        var changed = new SchemaGuidedOptionalNullRemovalStrategy()
-            .TryRepair(node, expectation, out var repaired);
+        var attempt = Repair(
+            new SchemaGuidedOptionalNullRemovalStrategy(),
+            node,
+            expectation);
 
-        changed.Should().BeFalse();
-        repaired.AsObject().ContainsKey("value").Should().BeTrue();
-        expectation.Validate(repaired).Should().ContainSingle();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.NotApplicable);
+        node.AsObject().ContainsKey("value").Should().BeTrue();
+        expectation.Validate(node).Should().ContainSingle();
     }
 
     [Fact]
-    public void TryRepair_PreservesOptionalNullAllowedBySchema()
+    public void RepairAsync_PreservesOptionalNullAllowedBySchema()
     {
         var node = JsonNode.Parse("""{"value":null}""")!;
         var expectation = JsonSchemaExpectation.FromSchemaJson(
@@ -82,11 +89,20 @@ public sealed class SchemaGuidedOptionalNullRemovalStrategyTests
             }
             """)!;
 
-        var changed = new SchemaGuidedOptionalNullRemovalStrategy()
-            .TryRepair(node, expectation, out var repaired);
+        var attempt = Repair(
+            new SchemaGuidedOptionalNullRemovalStrategy(),
+            node,
+            expectation);
 
-        changed.Should().BeFalse();
-        repaired.AsObject().ContainsKey("value").Should().BeTrue();
-        expectation.Validate(repaired).Should().BeEmpty();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.NotApplicable);
+        node.AsObject().ContainsKey("value").Should().BeTrue();
+        expectation.Validate(node).Should().BeEmpty();
     }
+
+    private static NodeRepairAttempt Repair(
+        INodeRepair strategy,
+        JsonNode node,
+        JsonSchemaExpectation expectation) =>
+        strategy.RepairAsync(node, expectation).GetAwaiter().GetResult();
 }

@@ -9,21 +9,27 @@ namespace Penghou.Nuwa.Strategies;
 /// Required properties and schemas that explicitly allow null are preserved.
 /// </summary>
 public sealed class SchemaGuidedOptionalNullRemovalStrategy
-    : INodeRepairStrategy
+    : INodeRepair
 {
     public string Name => "schema-guided-optional-null-removal";
 
-    public bool TryRepair(
+    public ValueTask<NodeRepairAttempt> RepairAsync(
         JsonNode node,
         JsonSchemaExpectation expectation,
-        out JsonNode repaired)
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(expectation);
 
-        repaired = node.DeepClone();
+        var repaired = node.DeepClone();
         var changed = RepairNode(repaired, expectation);
-        return changed;
+
+        return new(new NodeRepairAttempt(
+            changed
+                ? RepairOutcome.Repaired
+                : RepairOutcome.NotApplicable,
+            changed ? repaired : null));
     }
 
     private static bool RepairNode(

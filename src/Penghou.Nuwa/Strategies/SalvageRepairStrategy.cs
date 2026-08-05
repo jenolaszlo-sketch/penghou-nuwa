@@ -1,17 +1,42 @@
 using System.Text;
+using System.Text.Json;
 
-namespace Penghou.Nuwa;
+namespace Penghou.Nuwa.Strategies;
 
 /// <summary>
 /// Self-contained text-level salvage pass for malformed JSON that the
 /// handwritten recovery parser cannot rebuild. Handles the common "almost
 /// JSON" shapes that models emit: comments, Python-style literals,
 /// single-quoted strings, unquoted object keys and values, and raw control
-/// characters inside strings. Replaces the previous external repair
-/// dependency and owns no mutable parser state.
+/// characters inside strings. Lossy by design, so it runs only after recovery
+/// has failed.
 /// </summary>
-internal static class TolerantJsonTextRepair
+public sealed class SalvageRepairStrategy
+    : ITextRepair
 {
+    public string Name => "salvage";
+
+    public ValueTask<TextRepairAttempt> RepairAsync(
+        string input,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var repaired = TryRepair(input);
+
+        if (repaired is null ||
+            string.Equals(repaired, input, StringComparison.Ordinal))
+        {
+            return new(new TextRepairAttempt(
+                RepairOutcome.NotApplicable,
+                null));
+        }
+
+        return new(new TextRepairAttempt(
+            RepairOutcome.Repaired,
+            repaired));
+    }
+
     /// <summary>
     /// Returns the best-effort repaired text, or null when the input is
     /// empty or whitespace-only. The caller is responsible for attempting to
@@ -525,10 +550,10 @@ internal static class TolerantJsonTextRepair
     {
         try
         {
-            using var _ = System.Text.Json.JsonDocument.Parse(text);
+            using var _ = JsonDocument.Parse(text);
             return true;
         }
-        catch (System.Text.Json.JsonException)
+        catch (JsonException)
         {
             return false;
         }
@@ -536,8 +561,7 @@ internal static class TolerantJsonTextRepair
 
     private static bool IsRawControl(
         char value) =>
-        value < 0x20 &&
-        value is not ('\t' or '\n' or '\r');
+        value < 0x20;
 
     private static bool IsInvalidOutsideString(
         char value) =>

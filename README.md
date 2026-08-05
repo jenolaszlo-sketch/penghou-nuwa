@@ -14,87 +14,172 @@ recovers a `System.Text.Json` document from that output instead of failing.
 dotnet add package Penghou.Nuwa
 ```
 
+or pin the version explicitly:
+
+```xml
+<PackageReference Include="Penghou.Nuwa" Version="0.2.0" />
+```
+
 Targets `net8.0`, `net9.0`, and `net10.0`.
 
 ## Quick start
 
+The one-shot helper builds a default pipeline for each call — fine for
+occasional use:
+
 ```csharp
+using Penghou.Nuwa;
+
+using var result = await JsonRepair.RepairAsync(
+    """{"files":[{"path":"Program.cs","content": using System; var message = "hello"; }]}""");
+
+if (result.Succeeded)
+{
+    var root = result.GetRootOrThrow();
+    Console.WriteLine(result.RepairedText);
+    Console.WriteLine(result.WasRepaired);   // true
+}
+```
+
+For repeated calls, build a pipeline once and reuse it:
+
+```csharp
+var pipeline = JsonRepairPipeline.Create();
+
+// Or with configuration:
+var pipeline = JsonRepairPipeline.Create(options =>
+{
+    options.RemoveTextRepair<PseudoCSharpVerbatimStringRepairStrategy>();
+    options.DisableSalvageFallback();
+});
+```
+
+### Dependency injection
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
 using Penghou.Nuwa;
 using Penghou.Nuwa.Extensions;
 
 var services = new ServiceCollection();
 services.AddLogging();
-services.AddJsonRepair();
+services.AddJsonRepair(); // or AddJsonRepair(options => ...)
 
 using var provider = services.BuildServiceProvider();
 var pipeline = provider.GetRequiredService<IJsonRepairPipeline>();
 
-using var result = pipeline.Repair(
-    """{"files":[{"path":"Program.cs","content": using System; var message = "hello"; }]}""");
+using var result = await pipeline.RepairAsync(input);
 
 if (result.Succeeded)
 {
-    var root = result.Document.RootElement;
-    Console.WriteLine(result.WasRepaired);   // true
+    Console.WriteLine(result.GetRepairedTextOrThrow());
 }
 ```
 
-The pipeline is layered. Each layer is optional and composable, so you can
-call any stage directly:
+### Schema-guided repair
+
+Pass the JSON Schema of the expected shape (for example the tool-arguments
+schema) to enable schema-aware recovery and the node-repair phase:
 
 ```csharp
-// Schema-guided recovery is the most powerful path. Pass the JSON Schema of
-// the expected shape (e.g. the tool arguments schema) to drive repairs.
 var expectation = JsonSchemaExpectation.FromSchemaJson(schemaJson);
-var parse = new TolerantJsonSyntaxTreeParser().Parse(input, expectation);
+
+using var result = await pipeline.RepairAsync(input, expectation);
+
+if (result.Succeeded)
+{
+    var files = result.GetRootOrThrow()["files"];
+}
 ```
 
 ## How it works
 
-Repair runs through up to four stages, stopping as soon as the input parses:
+Repair runs through up to four stages:
 
 1. **Text-repair strategies** — targeted rewrites of malformed *text* that
    cannot be a tree yet: Markdown JSON fences, C# verbatim strings
-   (`@"..."`), and JavaScript template literals (`` `...` ``).
+   (`@"..."`), and JavaScript template literals (`` `...` ``). Stops as soon
+   as the text parses.
 2. **Tolerant syntax-tree recovery** — a handwritten parser that builds a
    `JsonNode` while using container state, bounded lookahead, and the schema
    at the current path to recover punctuation (missing commas, closers,
    quotes, unquoted keys) without inventing semantic values.
-3. **Schema-guided node strategies** — fixes that survive as *valid but
+3. **Self-contained text salvage** — a lossy fallback that runs only when
+   recovery fails: strips comments, normalizes Python literals, converts
+   single-quoted strings, quotes unquoted keys, and completes unclosed
+   containers. No external JSON-repair dependency.
+4. **Schema-guided node strategies** — fixes that survive as *valid but
    wrong-shaped* JSON: expanding a field that arrived as a JSON string back
    into an array or object, and removing optional `null` values that a strict
    schema rejects.
-4. **Self-contained text salvage** — a final pass that strips comments,
-   normalizes Python literals, converts single-quoted strings, quotes
-   unquoted keys, and completes unclosed containers. No external JSON-repair
-   dependency.
 
-Every result records `Attempts`, a per-stage audit of what ran and whether it
-applied:
+Every result carries a per-strategy audit. Each configured strategy is
+reported exactly once, in order, with its status and an optional note:
 
 ```csharp
-foreach (var (stage, outcome) in result.Attempts)
-    Console.WriteLine($"{stage}: {outcome}");
+foreach (var report in result.TextRepairs)
+{
+    Console.WriteLine(
+        $"{report.Name}: {report.Status}" +
+        (report.Note is null ? "" : $" ({report.Note})"));
+}
+
+var winner = result.SucceededBy;   // strategy that produced the final document, if any
 ```
 
 ## Customization
 
-Register your own strategies with the same `ITextRepairStrategy` /
-`INodeRepairStrategy` contracts, or compose `JsonRepairPipeline` directly
-with the order you want:
+Configure the strategy lists with `JsonRepairOptions`, through either
+`AddJsonRepair` or `JsonRepairPipeline.Create`:
 
 ```csharp
-var pipeline = new JsonRepairPipeline(
-    preprocessingStrategies,
-    tolerantParser,
-    nodeRepairStrategies,
-    logger);
+services.AddJsonRepair(options =>
+{
+    // Insert a custom strategy after a default one.
+    options.InsertTextRepairAfter<MarkdownJsonFenceRepairStrategy, MyFenceStrategy>();
+
+    // Turn off the lossy fallback phase entirely.
+    options.DisableSalvageFallback();
+
+    // Replace the node strategies.
+    options.ClearNodeRepairs();
+    options.AddNodeRepair<MyNodeStrategy>();
+});
 ```
+
+Implement the `ITextRepair` / `INodeRepair` contracts. Return
+`RepairOutcome.NotApplicable` to decline, `Repaired` with the repaired
+text/tree to apply, or `Failed`. `Note` carries optional diagnostic detail:
+
+```csharp
+public sealed class MyFenceStrategy : ITextRepair
+{
+    public string Name => "my-fence";
+
+    public ValueTask<TextRepairAttempt> RepairAsync(
+        string input,
+        CancellationToken cancellationToken = default)
+    {
+        if (!input.StartsWith("[BEGIN]"))
+        {
+            return new(new TextRepairAttempt(
+                RepairOutcome.NotApplicable,
+                Repaired: null));
+        }
+
+        return new(new TextRepairAttempt(
+            RepairOutcome.Repaired,
+            input.Replace("[BEGIN]", "").Replace("[END]", "")));
+    }
+}
+```
+
+Strategies can depend on injected services (including `ILogger<T>`); register
+them by type through `JsonRepairOptions` and they are resolved from the
+container.
 
 ## Feedback and attribution
 
-Penghou.Nuwa began as the repair pipeline of the [Solo] autonomous code
+Penghou.Nuwa began as the repair pipeline of the Solo autonomous code
 generation project. Its recovery parser is schema-aware and empirically tuned
 against real model output (see the model compatibility notes in Solo).
-
-[Solo]: https://github.com/your-account/solo

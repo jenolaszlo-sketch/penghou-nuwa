@@ -1,12 +1,11 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
 
 namespace Penghou.Nuwa;
 
 /// <summary>
 /// Recovers a JSON syntax tree from malformed input. The handwritten parser
-/// owns schema-aware token recovery; a self-contained text-repair pass is the
-/// fallback for malformed forms outside the recovery grammar.
+/// owns schema-aware token recovery. Text-level salvage is owned by the
+/// pipeline's ordered fallback phase and runs only when recovery fails.
 /// </summary>
 public sealed class TolerantJsonSyntaxTreeParser
     : ITolerantJsonSyntaxTreeParser
@@ -37,32 +36,10 @@ public sealed class TolerantJsonSyntaxTreeParser
                     DescribeRecovery(recovery));
             }
 
-            var repairedJson =
-                TolerantJsonTextRepair.TryRepair(
-                    input);
-
-            if (repairedJson is null)
-            {
-                return new TolerantJsonSyntaxTreeParseResult(
-                    Root: null,
-                    Outcome:
-                        "failed: text repair produced no output");
-            }
-
-            var root = JsonNode.Parse(repairedJson);
-            var outcome =
-                $"succeeded: tolerant text repair; {DescribeRepair(
-                    input,
-                    repairedJson)}";
-
-            return root is null
-                ? new TolerantJsonSyntaxTreeParseResult(
-                    Root: null,
-                    Outcome:
-                        "failed: text repair produced a null root")
-                : new TolerantJsonSyntaxTreeParseResult(
-                    Root: root,
-                    Outcome: outcome);
+            return new TolerantJsonSyntaxTreeParseResult(
+                Root: null,
+                Outcome:
+                    "failed: handwritten recovery could not rebuild a syntax tree");
         }
         catch (JsonException ex)
         {
@@ -102,52 +79,4 @@ public sealed class TolerantJsonSyntaxTreeParser
 
         return outcome;
     }
-
-    private static string DescribeRepair(
-        string input,
-        string repaired)
-    {
-        var mismatch = FindFirstMismatch(input, repaired);
-
-        if (mismatch < 0)
-            return "succeeded: recovered a syntax tree";
-
-        var found = mismatch < input.Length
-            ? DescribeCharacter(input[mismatch])
-            : "end of input";
-        var replacement = mismatch < repaired.Length
-            ? DescribeCharacter(repaired[mismatch])
-            : "end of input";
-
-        return
-            $"succeeded: recovered a syntax tree; first correction at offset {mismatch} replaced {found} with {replacement}";
-    }
-
-    private static int FindFirstMismatch(
-        string left,
-        string right)
-    {
-        var commonLength = Math.Min(
-            left.Length,
-            right.Length);
-
-        for (var index = 0; index < commonLength; index++)
-        {
-            if (left[index] != right[index])
-                return index;
-        }
-
-        return left.Length == right.Length
-            ? -1
-            : commonLength;
-    }
-
-    private static string DescribeCharacter(char value) =>
-        value switch
-        {
-            '\r' => "'\\r'",
-            '\n' => "'\\n'",
-            '\t' => "'\\t'",
-            _ => $"'{value}'"
-        };
 }

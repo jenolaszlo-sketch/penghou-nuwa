@@ -18,7 +18,7 @@ public sealed class JsonRepairPipelineIntegrationTests
         using var provider = services.BuildServiceProvider();
         var pipeline = provider.GetRequiredService<IJsonRepairPipeline>();
 
-        using var result = pipeline.Repair(
+        using var result = Repair(pipeline, 
             """
             ```json
             {
@@ -54,14 +54,16 @@ public sealed class JsonRepairPipelineIntegrationTests
             ```
             """;
 
-        using var result = pipeline.Repair(
+        using var result = Repair(pipeline, 
             input,
             CreateEmitFilesExpectation());
 
         result.Succeeded.Should().BeTrue();
         result.WasRepaired.Should().BeTrue();
-        result.Attempts.Should().ContainKey(
-            "pseudo-javascript-template-string");
+        result.TextRepairs.Should().Contain(
+            report =>
+                report.Name == "pseudo-javascript-template-string" &&
+                report.Status == StrategyStatus.Succeeded);
         var files = result.Document!.RootElement
             .GetProperty("files");
         files.GetArrayLength().Should().Be(1);
@@ -82,14 +84,13 @@ public sealed class JsonRepairPipelineIntegrationTests
             "}]}
             """;
 
-        using var result = pipeline.Repair(
+        using var result = Repair(pipeline, 
             input,
             CreateEmitFilesExpectation());
 
         result.Succeeded.Should().BeTrue();
         result.WasRepaired.Should().BeTrue();
-        result.Attempts.Should().ContainKey(
-            "tolerant-syntax-tree");
+        result.TolerantParse.Should().NotBeNull();
         var content = result.Document!.RootElement
             .GetProperty("files")[0]
             .GetProperty("content")
@@ -110,19 +111,28 @@ public sealed class JsonRepairPipelineIntegrationTests
             }
             """;
 
-        using var result = pipeline.Repair(
+        using var result = Repair(pipeline, 
             input,
             CreateEmitFilesExpectation());
 
         result.Succeeded.Should().BeTrue();
-        result.Attempts.Should().Contain(
-            "schema-guided-json-string-expansion",
-            "succeeded");
+        result.NodeRepairs.Should().Contain(
+            report =>
+                report.Name == "schema-guided-json-string-expansion" &&
+                report.Status == StrategyStatus.Succeeded);
         result.Document!.RootElement
             .GetProperty("files")
             .ValueKind.Should()
             .Be(JsonValueKind.Array);
     }
+
+    private static JsonRepairResult Repair(
+        IJsonRepairPipeline pipeline,
+        string input,
+        JsonSchemaExpectation? expectation = null) =>
+        pipeline.RepairAsync(input, expectation)
+            .GetAwaiter()
+            .GetResult();
 
     private static JsonRepairPipeline CreateDefaultPipeline()
     {
@@ -134,6 +144,7 @@ public sealed class JsonRepairPipelineIntegrationTests
                 new PseudoCSharpVerbatimStringRepairStrategy(),
                 new PseudoJavaScriptTemplateStringRepairStrategy()
             ],
+            [new SalvageRepairStrategy()],
             tolerantParser,
             [
                 new SchemaGuidedOptionalNullRemovalStrategy(),

@@ -4,20 +4,45 @@ using System.Text.Json;
 namespace Penghou.Nuwa.Strategies;
 
 public sealed class PseudoCSharpVerbatimStringRepairStrategy
-    : ITextRepairStrategy
+    : ITextRepair
 {
     public string Name => "pseudo-csharp-verbatim-string";
 
     private const int MaxRepairs = 32;
     private const int MaxCandidatesPerLiteral = 64;
 
-    public bool MightApply(string text)
+    public ValueTask<TextRepairAttempt> RepairAsync(
+        string input,
+        CancellationToken cancellationToken = default)
     {
-        return text.Contains("@\"", StringComparison.Ordinal)
-            || text.Contains("@$", StringComparison.Ordinal); // covers $@"" as well
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return new(new TextRepairAttempt(
+                RepairOutcome.NotApplicable,
+                null));
+        }
+
+        if (!input.Contains("@\"", StringComparison.Ordinal) &&
+            !input.Contains("@$", StringComparison.Ordinal))
+        {
+            // Covers $@"" as well.
+            return new(new TextRepairAttempt(
+                RepairOutcome.NotApplicable,
+                null));
+        }
+
+        var changed = TryRepair(input, out var repaired);
+
+        return new(new TextRepairAttempt(
+            changed
+                ? RepairOutcome.Repaired
+                : RepairOutcome.NotApplicable,
+            changed ? repaired : null));
     }
 
-    public bool TryRepair(string input, out string repaired)
+    private static bool TryRepair(string input, out string repaired)
     {
         repaired = input;
 

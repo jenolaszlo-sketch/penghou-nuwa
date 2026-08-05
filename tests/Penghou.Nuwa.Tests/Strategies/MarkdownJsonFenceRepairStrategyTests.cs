@@ -11,7 +11,7 @@ public sealed class MarkdownJsonFenceRepairStrategyTests
         new();
 
     [Fact]
-    public void TryRepair_RemovesJsonFenceFromContentToolCall()
+    public void RepairAsync_RemovesJsonFenceFromContentToolCall()
     {
         const string input =
             """
@@ -30,11 +30,11 @@ public sealed class MarkdownJsonFenceRepairStrategyTests
             ```
             """;
 
-        var changed = _strategy.TryRepair(
-            input,
-            out var repaired);
+        var attempt = Repair(_strategy, input);
+        var repaired = attempt.Repaired!;
 
-        changed.Should().BeTrue();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired);
 
         repaired.Should()
             .NotStartWith("```");
@@ -74,7 +74,7 @@ public sealed class MarkdownJsonFenceRepairStrategyTests
     }
 
     [Fact]
-    public void TryRepair_RemovesOpeningFenceWhenClosingFenceIsMissing()
+    public void RepairAsync_RemovesOpeningFenceWhenClosingFenceIsMissing()
     {
         const string input =
             """
@@ -87,11 +87,11 @@ public sealed class MarkdownJsonFenceRepairStrategyTests
             }
             """;
 
-        var changed = _strategy.TryRepair(
-            input,
-            out var repaired);
+        var attempt = Repair(_strategy, input);
+        var repaired = attempt.Repaired!;
 
-        changed.Should().BeTrue();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired);
 
         repaired.Should()
             .NotContain("```");
@@ -113,7 +113,7 @@ public sealed class MarkdownJsonFenceRepairStrategyTests
     }
 
     [Fact]
-    public void TryRepair_RemovesTildeJsonFence()
+    public void RepairAsync_RemovesTildeJsonFence()
     {
         const string input =
             """
@@ -127,11 +127,11 @@ public sealed class MarkdownJsonFenceRepairStrategyTests
             ~~~
             """;
 
-        var changed = _strategy.TryRepair(
-            input,
-            out var repaired);
+        var attempt = Repair(_strategy, input);
+        var repaired = attempt.Repaired!;
 
-        changed.Should().BeTrue();
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.Repaired);
 
         using var document = ParseStrict(repaired);
 
@@ -160,16 +160,20 @@ public sealed class MarkdownJsonFenceRepairStrategyTests
         Console.WriteLine("Hello");
         ```
         """)]
-    public void TryRepair_DoesNotModifyUnsupportedInput(
+    public void RepairAsync_DoesNotModifyUnsupportedInput(
         string input)
     {
-        var changed = _strategy.TryRepair(
-            input,
-            out var repaired);
+        var attempt = Repair(_strategy, input);
 
-        changed.Should().BeFalse();
-        repaired.Should().Be(input);
+        attempt.Outcome.Should()
+            .Be(RepairOutcome.NotApplicable);
+        attempt.Repaired.Should().BeNull();
     }
+
+    private static TextRepairAttempt Repair(
+        ITextRepair strategy,
+        string input) =>
+        strategy.RepairAsync(input).GetAwaiter().GetResult();
 
     private static JsonDocument ParseStrict(
         string json)

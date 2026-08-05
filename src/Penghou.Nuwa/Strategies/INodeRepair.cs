@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Nodes;
+using System.Text.Json.Nodes;
 
 namespace Penghou.Nuwa.Strategies;
 
@@ -7,9 +7,12 @@ namespace Penghou.Nuwa.Strategies;
 /// (e.g. an array serialized as a string). Operates on a parsed JsonNode tree
 /// because detecting "wrong shape" requires knowing each node's actual JsonValueKind.
 /// </summary>
-public interface INodeRepairStrategy
+public interface INodeRepair
 {
     string Name { get; }
 
-    bool TryRepair(JsonNode node, JsonSchemaExpectation expectation, out JsonNode repaired);
+    ValueTask<NodeRepairAttempt> RepairAsync(
+        JsonNode node,
+        JsonSchemaExpectation expectation,
+        CancellationToken cancellationToken = default);
 }

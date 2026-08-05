@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Penghou.Nuwa.Strategies;
 
 namespace Penghou.Nuwa.Extensions;
@@ -6,34 +7,79 @@ namespace Penghou.Nuwa.Extensions;
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddJsonRepair(
-        this IServiceCollection services)
+        this IServiceCollection services) =>
+        services.AddJsonRepair(_ => { });
+
+    public static IServiceCollection AddJsonRepair(
+        this IServiceCollection services,
+        Action<JsonRepairOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
 
-        services.AddSingleton<
-            IReadOnlyList<ITextRepairStrategy>>(
-            [
-                new MarkdownJsonFenceRepairStrategy(),
-                new PseudoCSharpVerbatimStringRepairStrategy(),
-                new PseudoJavaScriptTemplateStringRepairStrategy()
-            ]);
+        var options = new JsonRepairOptions();
+        configure(options);
+        options.Validate();
+
+        foreach (var type in options
+                     .TextRepairs
+                     .Concat(options.SalvageRepairs))
+        {
+            services.AddSingleton(type);
+        }
+
+        foreach (var type in options.NodeRepairs)
+        {
+            services.AddSingleton(type);
+        }
 
         services.AddSingleton<
             ITolerantJsonSyntaxTreeParser,
             TolerantJsonSyntaxTreeParser>();
-        services.AddSingleton<
-            IReadOnlyList<INodeRepairStrategy>>(
+
+        services.AddSingleton<IJsonRepairPipeline>(
             serviceProvider =>
-            [
-                new SchemaGuidedOptionalNullRemovalStrategy(),
-                new SchemaGuidedJsonStringExpansionStrategy(
+            {
+                var textRepairs =
+                    ResolveRepairs<ITextRepair>(
+                        serviceProvider,
+                        options.TextRepairs);
+                var salvageRepairs =
+                    ResolveRepairs<ITextRepair>(
+                        serviceProvider,
+                        options.SalvageRepairs);
+                var nodeRepairs =
+                    ResolveRepairs<INodeRepair>(
+                        serviceProvider,
+                        options.NodeRepairs);
+
+                return new JsonRepairPipeline(
+                    textRepairs,
+                    salvageRepairs,
                     serviceProvider.GetRequiredService<
-                        ITolerantJsonSyntaxTreeParser>())
-            ]);
-        services.AddSingleton<
-            IJsonRepairPipeline,
-            JsonRepairPipeline>();
+                        ITolerantJsonSyntaxTreeParser>(),
+                    nodeRepairs,
+                    serviceProvider.GetRequiredService<
+                        ILogger<JsonRepairPipeline>>());
+            });
 
         return services;
+    }
+
+    private static IReadOnlyList<T> ResolveRepairs<T>(
+        IServiceProvider serviceProvider,
+        IReadOnlyList<Type> types)
+        where T : class
+    {
+        var repairs = new T[types.Count];
+
+        for (var index = 0; index < types.Count; index++)
+        {
+            repairs[index] =
+                (T)serviceProvider.GetRequiredService(
+                    types[index]);
+        }
+
+        return repairs;
     }
 }
