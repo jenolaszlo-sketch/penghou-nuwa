@@ -7,3 +7,6 @@ TestResults/
 *.nupkg
 *.snupkg
 artifacts/
+coverage/
+coverage-ai/
+*.cobertura.xml

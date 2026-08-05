@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+
+    <PackageId>Penghou.Nuwa.Extensions.AI</PackageId>
+    <Title>Penghou Nuwa Extensions for Microsoft.Extensions.AI</Title>
+    <Version>0.2.1</Version>
+    <Authors>Penghou.Nuwa contributors</Authors>
+    <Description>Drops Penghou.Nuwa JSON repair into any Microsoft.Extensions.AI chat-client pipeline: repaired tool-call arguments and structured-output text before they reach your code.</Description>
+    <PackageTags>json;json-repair;llm;structured-output;tool-calling;ai;microsoft-extensions-ai</PackageTags>
+    <RepositoryUrl>https://github.com/jenolaszlo-sketch/penghou-nuwa</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/jenolaszlo-sketch/penghou-nuwa</PackageProjectUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+    <IsPackable>true</IsPackable>
+
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <Deterministic>true</Deterministic>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.8.3" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Penghou.Nuwa\Penghou.Nuwa.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Penghou.Nuwa.Extensions.AI.Tests" />
+  </ItemGroup>
+
+</Project>

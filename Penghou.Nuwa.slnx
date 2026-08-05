@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Penghou.Nuwa/Penghou.Nuwa.csproj" />
+    <Project Path="src/Penghou.Nuwa.Extensions.AI/Penghou.Nuwa.Extensions.AI.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Penghou.Nuwa.Tests/Penghou.Nuwa.Tests.csproj" />
+    <Project Path="tests/Penghou.Nuwa.Extensions.AI.Tests/Penghou.Nuwa.Extensions.AI.Tests.csproj" />
   </Folder>
 </Solution>

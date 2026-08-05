@@ -31,10 +31,14 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             args+=(--property:PackageVersion="${GITHUB_REF_NAME#v}")
           fi
-          dotnet pack src/Penghou.Nuwa/Penghou.Nuwa.csproj \
-            --configuration Release \
-            --output ./artifacts \
-            "${args[@]}"
+          for csproj in \
+            src/Penghou.Nuwa/Penghou.Nuwa.csproj \
+            src/Penghou.Nuwa.Extensions.AI/Penghou.Nuwa.Extensions.AI.csproj; do
+            dotnet pack "$csproj" \
+              --configuration Release \
+              --output ./artifacts \
+              "${args[@]}"
+          done
 
       - name: NuGet login (OIDC -> temp API key)
         id: login

@@ -23,7 +23,7 @@ jobs:
       - name: Build
         run: dotnet build Penghou.Nuwa.slnx --configuration Release
 
-      - name: Test and coverage
+      - name: Test and coverage (core)
         run: >
           dotnet test tests/Penghou.Nuwa.Tests/Penghou.Nuwa.Tests.csproj
           --configuration Release
@@ -34,8 +34,22 @@ jobs:
           /p:Threshold=75
           /p:ThresholdType=line
 
+      - name: Test and coverage (Extensions.AI)
+        run: >
+          dotnet test tests/Penghou.Nuwa.Extensions.AI.Tests/Penghou.Nuwa.Extensions.AI.Tests.csproj
+          --configuration Release
+          --no-restore
+          /p:CollectCoverage=true
+          /p:CoverletOutput=${{ github.workspace }}/coverage-ai/
+          /p:CoverletOutputFormat=cobertura
+          /p:Threshold=75
+          /p:ThresholdType=line
+
       - name: Upload coverage report
         uses: actions/upload-artifact@v6
         with:
           name: coverage-report
-          path: coverage/
+          path: |
+            coverage/
+            coverage-ai/
+          if-no-files-found: error
