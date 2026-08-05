@@ -11,17 +11,16 @@ namespace Penghou.Nuwa;
 /// </summary>
 public sealed record JsonSchemaExpectation(
     IReadOnlyDictionary<string, JsonSchemaFieldKind> PropertyKinds,
-    JsonNode? Schema = null)
+    JsonNode? Schema = null,
+    bool Nullable = false)
 {
-    internal bool AllowsNull => Schema is not JsonObject schemaObject ||
-        schemaObject["type"] is null ||
-        schemaObject["type"] is JsonValue value &&
-        value.TryGetValue<string>(out var type) && type == "null" ||
-        schemaObject["type"] is JsonArray types &&
-        types.Any(item =>
-            item is JsonValue itemValue &&
-            itemValue.TryGetValue<string>(out var itemType) &&
-            itemType == "null");
+    /// <summary>
+    /// Whether the schema allows the value to be null, either via an explicit
+    /// "null" in the type union, a <c>nullable</c> keyword, or an untyped
+    /// schema. Used to decide whether an explicit null on an optional property
+    /// may be dropped.
+    /// </summary>
+    internal bool AllowsNull => Nullable;
 
     public JsonSchemaFieldKind? ExpectedKind =>
         Schema is JsonObject schemaObject &&
@@ -41,30 +40,53 @@ public sealed record JsonSchemaExpectation(
     {
         ArgumentNullException.ThrowIfNull(schemaNode);
 
-        if (schemaNode is not JsonObject schemaObject)
-            return new JsonSchemaExpectation(
-                new Dictionary<string, JsonSchemaFieldKind>(),
-                schemaNode.DeepClone());
-
-        if (schemaObject["properties"] is not JsonObject properties)
-            return new JsonSchemaExpectation(
-                new Dictionary<string, JsonSchemaFieldKind>(),
-                schemaNode.DeepClone());
+        var schema = JsonSchemaNormalizer.Normalize(schemaNode);
 
         var propertyKinds = new Dictionary<string, JsonSchemaFieldKind>(StringComparer.Ordinal);
 
-        foreach (var (propertyName, propertySchema) in properties)
+        if (schema is JsonObject schemaObject &&
+            schemaObject["properties"] is JsonObject properties)
         {
-            if (propertySchema is not JsonObject propertyObject)
-                continue;
+            foreach (var (propertyName, propertySchema) in properties)
+            {
+                if (propertySchema is not JsonObject propertyObject)
+                    continue;
 
-            if (TryGetFieldKind(propertyObject, out var kind))
-                propertyKinds[propertyName] = kind;
+                if (TryGetFieldKind(propertyObject, out var kind))
+                    propertyKinds[propertyName] = kind;
+            }
         }
 
         return new JsonSchemaExpectation(
             propertyKinds,
-            schemaNode.DeepClone());
+            schema,
+            SchemaAllowsNull(schema));
+    }
+
+    private static bool SchemaAllowsNull(JsonNode schema)
+    {
+        if (schema is not JsonObject schemaObject)
+            return true;
+
+        if (schemaObject["nullable"] is JsonValue nullableValue &&
+            nullableValue.TryGetValue<bool>(out var isNullable) &&
+            isNullable)
+        {
+            return true;
+        }
+
+        return schemaObject["type"] switch
+        {
+            null => true,
+            JsonValue typeValue when typeValue.TryGetValue<string>(out var type) =>
+                type == "null",
+            JsonArray types =>
+                types.Any(item =>
+                    item is JsonValue itemValue &&
+                    itemValue.TryGetValue<string>(out var itemType) &&
+                    itemType == "null"),
+            _ => false
+        };
     }
 
     public static JsonSchemaExpectation? FromSchemaJson(

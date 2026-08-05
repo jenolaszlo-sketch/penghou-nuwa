@@ -62,8 +62,9 @@ public sealed class PublicApiContractTests
           method System.Text.Json.Nodes.JsonNode GetRootOrThrow()
           method static Penghou.Nuwa.JsonRepairResult Success(System.Text.Json.Nodes.JsonNode, System.String, System.String, System.Boolean, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport>, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport>)
         type Penghou.Nuwa.JsonSchemaExpectation : sealed class : System.IEquatable<Penghou.Nuwa.JsonSchemaExpectation>
-          ctor(System.Collections.Generic.IReadOnlyDictionary<System.String, Penghou.Nuwa.JsonSchemaFieldKind>, System.Text.Json.Nodes.JsonNode)
+          ctor(System.Collections.Generic.IReadOnlyDictionary<System.String, Penghou.Nuwa.JsonSchemaFieldKind>, System.Text.Json.Nodes.JsonNode, System.Boolean)
           property System.Nullable<Penghou.Nuwa.JsonSchemaFieldKind> ExpectedKind
+          property System.Boolean Nullable
           property System.Collections.Generic.IReadOnlyDictionary<System.String, Penghou.Nuwa.JsonSchemaFieldKind> PropertyKinds
           property System.Text.Json.Nodes.JsonNode Schema
           method static Penghou.Nuwa.JsonSchemaExpectation FromSchemaJson(System.String)

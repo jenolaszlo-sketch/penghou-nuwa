@@ -112,6 +112,15 @@ attributes, maps enums to strings, and recurses into nested objects, arrays,
 and dictionaries. Schema-guided repair is best-effort when no expectation is
 passed at all — text repair and tolerant recovery still run.
 
+Schema handling is **repair-only**: `FromSchemaJson`/`FromSchemaNode` extract
+the shape facts the recovery pipeline needs (types, properties, required,
+items, nullability) and normalize common constructs — local `$ref`/`$defs`
+pointers are inlined, `oneOf`/`anyOf`/`allOf`/`enum` are reduced to a
+canonical type form, and recursive references are cut so repair terminates.
+This is intentionally **not** a JSON Schema dialect converter or validator for
+model-facing output; do not feed a `JsonSchemaExpectation.Schema` back to an
+LLM or use it as the authoritative contract for a remote API.
+
 ## Microsoft.Extensions.AI integration
 
 The companion package **`Penghou.Nuwa.Extensions.AI`** drops Nuwa repair into
