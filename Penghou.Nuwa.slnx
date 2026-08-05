@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Penghou.Nuwa/Penghou.Nuwa.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Penghou.Nuwa.Tests/Penghou.Nuwa.Tests.csproj" />
+  </Folder>
+</Solution>
