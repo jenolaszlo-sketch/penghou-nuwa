@@ -231,7 +231,8 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
         files.GetArrayLength().Should().Be(1);
         var content = files[0]
             .GetProperty("content")
-            .GetString();
+            .GetString()!
+            .Replace("\r\n", "\n");
         content.Should().Contain(
             "GetFromJsonAsync<GreetingResponse>(\"/greeting?name=Solo\")");
         content.Should().Contain(
@@ -315,14 +316,10 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
         result.Succeeded.Should().BeTrue();
         result.Document!.RootElement
             .GetProperty("value")
-            .GetString()
+            .GetString()!
+            .Replace("\r\n", "\n")
             .Should()
-            .Be(
-                """
-                using Solo.Generated;
-                var name = "Jeno";
-
-                """);
+            .Be("using Solo.Generated;\nvar name = \"Jeno\";\n");
     }
 
     [Fact]
