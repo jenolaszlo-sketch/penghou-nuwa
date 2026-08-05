@@ -6,6 +6,7 @@ namespace Penghou.Nuwa;
 public sealed class JsonRepairResult(
     JsonDocument? document,
     JsonNode? root,
+    string originalText,
     string? repairedText,
     bool wasRepaired,
     IReadOnlyList<StrategyReport> textRepairs,
@@ -20,6 +21,9 @@ public sealed class JsonRepairResult(
     /// <see cref="Document"/> and remains valid after disposal.
     /// </summary>
     public JsonNode? Root { get; } = root;
+
+    /// <summary>The exact input that was passed to the pipeline.</summary>
+    public string OriginalText { get; } = originalText;
 
     /// <summary>
     /// The best-effort JSON text produced by the pipeline. When

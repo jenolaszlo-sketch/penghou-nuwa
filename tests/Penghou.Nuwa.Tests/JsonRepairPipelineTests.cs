@@ -1,4 +1,5 @@
 ﻿using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Penghou.Nuwa.Strategies;
 
@@ -219,6 +220,27 @@ public sealed class JsonRepairPipelineTests
         applied.Should().BeEmpty();
     }
 
+    [Fact]
+    public void RepairAsync_LogsWinnerAndElapsedTime()
+    {
+        var logger = new CapturingLogger();
+        var pipeline = new JsonRepairPipeline(
+            [],
+            [new SalvageRepairStrategy()],
+            new TolerantJsonSyntaxTreeParser(),
+            [],
+            logger);
+
+        using var result = Repair(pipeline, "{name: None}");
+
+        result.Succeeded.Should().BeTrue();
+        logger.Messages.Should().Contain(
+            entry =>
+                entry.Level == LogLevel.Warning &&
+                entry.Message.Contains("salvage") &&
+                entry.Message.Contains("ms"));
+    }
+
     private static JsonRepairResult Repair(
         IJsonRepairPipeline pipeline,
         string input,
@@ -278,5 +300,28 @@ public sealed class JsonRepairPipelineTests
                 RepairOutcome.NotApplicable,
                 null,
                 "declined"));
+    }
+
+    private sealed class CapturingLogger
+        : ILogger<JsonRepairPipeline>
+    {
+        public List<(LogLevel Level, string Message)> Messages { get; } = [];
+
+        public IDisposable? BeginScope<TState>(
+            TState state)
+            where TState : notnull =>
+            null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add((logLevel, formatter(state, exception)));
+        }
     }
 }

@@ -5,22 +5,31 @@
 
     <PackageId>Penghou.Nuwa</PackageId>
     <Title>Penghou Nuwa</Title>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <Authors>Penghou.Nuwa contributors</Authors>
     <Description>A repair and recovery pipeline for malformed JSON and structured output produced by language models.</Description>
     <PackageTags>json;json-repair;llm;structured-output;tool-calling;ai</PackageTags>
     <RepositoryUrl>https://github.com/jenolaszlo-sketch/penghou-nuwa</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/jenolaszlo-sketch/penghou-nuwa</PackageProjectUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
     <IsPackable>true</IsPackable>
+
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <Deterministic>true</Deterministic>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

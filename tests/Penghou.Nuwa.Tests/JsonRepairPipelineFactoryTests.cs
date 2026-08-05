@@ -98,6 +98,17 @@ public sealed class JsonRepairPipelineFactoryTests
     }
 
     [Fact]
+    public void Result_ExposesOriginalText()
+    {
+        var pipeline = JsonRepairPipeline.Create();
+        const string input = "{name: None}";
+
+        using var result = Repair(pipeline, input);
+
+        result.OriginalText.Should().Be(input);
+    }
+
+    [Fact]
     public void Result_ExposesRootAndRepairedText()
     {
         var pipeline = JsonRepairPipeline.Create();

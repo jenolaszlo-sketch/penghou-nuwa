@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Penghou.Nuwa.Strategies;
+using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -52,6 +53,25 @@ public sealed class JsonRepairPipeline(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(input);
 
+        var stopwatch = Stopwatch.StartNew();
+        var result = await RepairCoreAsync(
+            input,
+            expectation,
+            cancellationToken);
+        stopwatch.Stop();
+
+        LogOutcome(
+            result,
+            stopwatch.ElapsedMilliseconds);
+
+        return result;
+    }
+
+    private async ValueTask<JsonRepairResult> RepairCoreAsync(
+        string input,
+        JsonSchemaExpectation? expectation,
+        CancellationToken cancellationToken)
+    {
         var textReports = new List<StrategyReport>();
         var textWasRepaired = false;
         var current = input;
@@ -67,6 +87,7 @@ public sealed class JsonRepairPipeline(
                 expectation,
                 textReports,
                 textWasRepaired: false,
+                originalText: input,
                 tolerantParse: null,
                 cancellationToken);
         }
@@ -149,6 +170,7 @@ public sealed class JsonRepairPipeline(
                 expectation,
                 textReports,
                 textWasRepaired,
+                originalText: input,
                 tolerantParse: null,
                 cancellationToken);
         }
@@ -245,13 +267,10 @@ public sealed class JsonRepairPipeline(
 
         if (tolerantParse.Root is null)
         {
-            logger.LogWarning(
-                "Malformed JSON could not be repaired. Text repairs: {@TextRepairs}",
-                textReports);
-
             return new JsonRepairResult(
                 document: null,
                 root: null,
+                originalText: input,
                 repairedText: current,
                 wasRepaired: false,
                 textReports,
@@ -264,6 +283,7 @@ public sealed class JsonRepairPipeline(
             expectation,
             textReports,
             textWasRepaired: true,
+            originalText: input,
             tolerantParse,
             cancellationToken);
     }
@@ -273,13 +293,13 @@ public sealed class JsonRepairPipeline(
         JsonSchemaExpectation? expectation,
         IReadOnlyList<StrategyReport> textReports,
         bool textWasRepaired,
+        string originalText,
         TolerantJsonSyntaxTreeParseResult? tolerantParse,
         CancellationToken cancellationToken)
     {
         var nodeReports = new List<StrategyReport>();
         var current = root;
         var nodeWasRepaired = false;
-
         if (expectation is not null)
         {
             foreach (var strategy in nodeRepairs)
@@ -336,21 +356,44 @@ public sealed class JsonRepairPipeline(
             textWasRepaired ||
             nodeWasRepaired;
 
-        if (wasRepaired)
-        {
-            logger.LogWarning(
-                "Malformed JSON was repaired. Text repairs: {@TextRepairs}",
-                textReports);
-        }
-
         return new JsonRepairResult(
             document,
             current,
+            originalText,
             repairedText,
             wasRepaired,
             textReports,
             nodeReports,
             tolerantParse);
+    }
+
+    private void LogOutcome(
+        JsonRepairResult result,
+        long elapsedMilliseconds)
+    {
+        if (!result.Succeeded)
+        {
+            logger.LogWarning(
+                "Malformed JSON could not be repaired in {ElapsedMilliseconds} ms. Text repairs: {@TextRepairs}.",
+                elapsedMilliseconds,
+                result.TextRepairs);
+            return;
+        }
+
+        if (result.WasRepaired)
+        {
+            logger.LogWarning(
+                "Malformed JSON was repaired in {ElapsedMilliseconds} ms. Winner: {Winner}. Text repairs: {@TextRepairs}.",
+                elapsedMilliseconds,
+                result.SucceededBy?.Name,
+                result.TextRepairs);
+        }
+        else
+        {
+            logger.LogDebug(
+                "JSON parsed without repair in {ElapsedMilliseconds} ms.",
+                elapsedMilliseconds);
+        }
     }
 
     private static void ReportSkipped(

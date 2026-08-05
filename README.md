@@ -117,6 +117,9 @@ Every result carries a per-strategy audit. Each configured strategy is
 reported exactly once, in order, with its status and an optional note:
 
 ```csharp
+var original = result.OriginalText;   // the exact input you passed in
+var repaired = result.RepairedText;   // best-effort output (valid JSON when Succeeded)
+
 foreach (var report in result.TextRepairs)
 {
     Console.WriteLine(
@@ -125,6 +128,29 @@ foreach (var report in result.TextRepairs)
 }
 
 var winner = result.SucceededBy;   // strategy that produced the final document, if any
+```
+
+### Resource management and cancellation
+
+`JsonRepairResult` wraps a `JsonDocument` and is `IDisposable` — dispose it to
+free the underlying buffer. `Root` and `RepairedText` are independent of the
+document and stay valid after disposal:
+
+```csharp
+using var result = await pipeline.RepairAsync(input);
+// result.Root / result.RepairedText remain usable after the using block.
+```
+
+Repair is cooperative and accepts a `CancellationToken`. For a hard timeout,
+cancel with a linked token:
+
+```csharp
+using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+using var result = await pipeline.RepairAsync(
+    input,
+    expectation,
+    cts.Token);
 ```
 
 ## Customization
@@ -178,8 +204,43 @@ Strategies can depend on injected services (including `ILogger<T>`); register
 them by type through `JsonRepairOptions` and they are resolved from the
 container.
 
+Node strategies run against the parsed tree and use the expectation to detect
+*valid but wrong-shaped* JSON. Return the replacement node with
+`RepairOutcome.Repaired`:
+
+```csharp
+public sealed class MyNodeStrategy : INodeRepair
+{
+    public string Name => "my-node";
+
+    public ValueTask<NodeRepairAttempt> RepairAsync(
+        JsonNode node,
+        JsonSchemaExpectation expectation,
+        CancellationToken cancellationToken = default)
+    {
+        if (node["files"] is JsonValue value &&
+            value.TryGetValue<string>(out var text))
+        {
+            var array = JsonNode.Parse(text) as JsonArray;
+
+            if (array is not null)
+            {
+                node["files"] = array;
+                return new(new NodeRepairAttempt(
+                    RepairOutcome.Repaired,
+                    node));
+            }
+        }
+
+        return new(new NodeRepairAttempt(
+            RepairOutcome.NotApplicable,
+            null));
+    }
+}
+```
+
 ## Feedback and attribution
 
 Penghou.Nuwa began as the repair pipeline of the Solo autonomous code
 generation project. Its recovery parser is schema-aware and empirically tuned
-against real model output (see the model compatibility notes in Solo).
+against real model output.
