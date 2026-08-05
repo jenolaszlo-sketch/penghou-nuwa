@@ -17,7 +17,7 @@ dotnet add package Penghou.Nuwa
 or pin the version explicitly:
 
 ```xml
-<PackageReference Include="Penghou.Nuwa" Version="0.2.0" />
+<PackageReference Include="Penghou.Nuwa" Version="0.3.0" />
 ```
 
 Targets `net8.0`, `net9.0`, and `net10.0`. For Microsoft.Extensions.AI
@@ -130,7 +130,7 @@ OpenAI, Ollama, Semantic Kernel, and anything else that exposes an
 has done its work, so you get the fixes without forking provider SDKs.
 
 ```xml
-<PackageReference Include="Penghou.Nuwa.Extensions.AI" Version="0.2.1" />
+<PackageReference Include="Penghou.Nuwa.Extensions.AI" Version="0.3.0" />
 ```
 
 Two things get repaired, transparently:

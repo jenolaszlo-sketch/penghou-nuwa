@@ -5,7 +5,7 @@
 
     <PackageId>Penghou.Nuwa.Extensions.AI</PackageId>
     <Title>Penghou Nuwa Extensions for Microsoft.Extensions.AI</Title>
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
     <Authors>Penghou.Nuwa contributors</Authors>
     <Description>Drops Penghou.Nuwa JSON repair into any Microsoft.Extensions.AI chat-client pipeline: repaired tool-call arguments and structured-output text before they reach your code.</Description>
     <PackageTags>json;json-repair;llm;structured-output;tool-calling;ai;microsoft-extensions-ai</PackageTags>
