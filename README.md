@@ -1,12 +1,21 @@
 # Penghou.Nuwa
 
-A repair and recovery pipeline for malformed JSON and structured output
-produced by language models.
+[![NuGet](https://img.shields.io/nuget/v/Penghou.Nuwa)](https://www.nuget.org/packages/Penghou.Nuwa)
+[![CI](https://github.com/jenolaszlo-sketch/penghou-nuwa/actions/workflows/ci.yml/badge.svg)](https://github.com/jenolaszlo-sketch/penghou-nuwa/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/jenolaszlo-sketch/penghou-nuwa)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-512BD4)](https://dotnet.microsoft.com/)
 
-Language models regularly emit JSON that does not parse: unescaped quotes
-inside file contents, truncated tool-call arguments, Markdown fences, template
-literals, single quotes, Python literals, and missing brackets. Penghou.Nuwa
-recovers a `System.Text.Json` document from that output instead of failing.
+Penghou.Nuwa is a schema-aware **JSON repair and structured-output recovery**
+pipeline for .NET, designed around malformed output observed from real
+language models. It does more than fix text that fails to parse: it recovers
+*valid-but-wrong-shaped* JSON, double-serialized fields, schema mismatches,
+optional-null rejections, Markdown fences, truncated structures, and malformed
+tool arguments into a `System.Text.Json` document — instead of failing.
+
+That includes the classic failure modes — unescaped quotes inside file
+contents, truncated tool-call arguments, Markdown fences, template literals,
+single quotes, Python literals, and missing brackets — as well as valid JSON
+that a strict consumer rejects.
 
 ## Install
 
