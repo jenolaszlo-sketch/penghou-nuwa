@@ -38,18 +38,22 @@ public sealed class SchemaGuidedOptionalNullRemovalStrategy
     {
         var changed = false;
 
+        var effective =
+            expectation.TryResolveBranch(node) ??
+            expectation;
+
         if (node is JsonObject jsonObject)
         {
             foreach (var property in jsonObject.ToArray())
             {
                 var propertyExpectation =
-                    expectation.GetProperty(property.Key);
+                    effective.GetProperty(property.Key);
                 if (propertyExpectation is null)
                     continue;
 
                 if (property.Value is null)
                 {
-                    if (!expectation.RequiresProperty(property.Key) &&
+                    if (!effective.RequiresProperty(property.Key) &&
                         !propertyExpectation.AllowsNull)
                     {
                         jsonObject.Remove(property.Key);
@@ -65,7 +69,7 @@ public sealed class SchemaGuidedOptionalNullRemovalStrategy
             }
         }
         else if (node is JsonArray jsonArray &&
-                 expectation.GetItem() is { } itemExpectation)
+                 effective.GetItem() is { } itemExpectation)
         {
             foreach (var item in jsonArray)
             {

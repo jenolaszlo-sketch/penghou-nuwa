@@ -7,7 +7,9 @@ namespace Penghou.Nuwa.Strategies;
 /// Repairs JSON values that are syntactically valid but encoded at the wrong
 /// structural level, such as an array supplied as a JSON string. Only object
 /// and array expectations are expanded; scalar coercion is deliberately
-/// avoided because it can silently change model intent.
+/// avoided because it can silently change model intent. Union expectations are
+/// resolved to the branch that actually matches the content first, so a call
+/// attributed to one tool is never expanded using another tool's schema.
 /// </summary>
 public sealed class SchemaGuidedJsonStringExpansionStrategy
     : INodeRepair
@@ -50,12 +52,17 @@ public sealed class SchemaGuidedJsonStringExpansionStrategy
             if (parsed is not null &&
                 MatchesExpectedKind(
                     parsed,
-                    expectation.ExpectedKind))
+                    expectation.ExpectedKind) &&
+                expectation.Accepts(parsed))
             {
                 node = parsed;
                 changed = true;
             }
         }
+
+        var effective =
+            expectation.TryResolveBranch(node) ??
+            expectation;
 
         if (node is JsonObject jsonObject)
         {
@@ -65,7 +72,7 @@ public sealed class SchemaGuidedJsonStringExpansionStrategy
                     continue;
 
                 var propertyExpectation =
-                    expectation.GetProperty(property.Key);
+                    effective.GetProperty(property.Key);
 
                 if (propertyExpectation is null)
                     continue;
@@ -86,7 +93,7 @@ public sealed class SchemaGuidedJsonStringExpansionStrategy
         else if (node is JsonArray jsonArray)
         {
             var itemExpectation =
-                expectation.GetItem();
+                effective.GetItem();
 
             if (itemExpectation is not null)
             {

@@ -61,8 +61,14 @@ public sealed class PublicApiContractTests
           method System.String GetRepairedTextOrThrow()
           method System.Text.Json.Nodes.JsonNode GetRootOrThrow()
           method static Penghou.Nuwa.JsonRepairResult Success(System.Text.Json.Nodes.JsonNode, System.String, System.String, System.Boolean, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport>, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport>)
+        type Penghou.Nuwa.JsonSchemaBranch : sealed class : System.IEquatable<Penghou.Nuwa.JsonSchemaBranch>
+          ctor(Penghou.Nuwa.JsonSchemaExpectation, System.String, System.Collections.Generic.IReadOnlySet<System.String>)
+          property System.String DiscriminatorProperty
+          property System.Collections.Generic.IReadOnlySet<System.String> DiscriminatorValues
+          property Penghou.Nuwa.JsonSchemaExpectation Expectation
         type Penghou.Nuwa.JsonSchemaExpectation : sealed class : System.IEquatable<Penghou.Nuwa.JsonSchemaExpectation>
           ctor(System.Collections.Generic.IReadOnlyDictionary<System.String, Penghou.Nuwa.JsonSchemaFieldKind>, System.Text.Json.Nodes.JsonNode, System.Boolean)
+          property System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.JsonSchemaBranch> Branches
           property System.Nullable<Penghou.Nuwa.JsonSchemaFieldKind> ExpectedKind
           property System.Boolean Nullable
           property System.Collections.Generic.IReadOnlyDictionary<System.String, Penghou.Nuwa.JsonSchemaFieldKind> PropertyKinds

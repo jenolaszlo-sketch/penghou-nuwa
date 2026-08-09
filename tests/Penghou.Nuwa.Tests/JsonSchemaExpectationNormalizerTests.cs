@@ -278,4 +278,107 @@ public sealed class JsonSchemaExpectationNormalizerTests
         expectation.GetProperty("arguments")!.Schema!.AsObject()["required"]!.AsArray()
             .Should().Contain(node => node!.GetValue<string>() == "query");
     }
+
+    [Fact]
+    public void FromSchemaNode_BuildsBranchesWithDiscriminators()
+    {
+        var expectation = JsonSchemaExpectation.FromSchemaNode(
+            CreateToolUnionSchema());
+
+        expectation.Branches.Should().HaveCount(2);
+        expectation.Branches[0].DiscriminatorProperty.Should().Be("name");
+        expectation.Branches[0].DiscriminatorValues.Should()
+            .Contain("emit_files");
+        expectation.Branches[0].Expectation.GetProperty("arguments")!
+            .PropertyKinds.Should().Contain("files", JsonSchemaFieldKind.Array);
+        expectation.Branches[1].Expectation.GetProperty("arguments")!
+            .PropertyKinds.Should().Contain("count", JsonSchemaFieldKind.Number);
+    }
+
+    [Fact]
+    public void FromSchemaNode_UnionRootKeepsCanonicalShape()
+    {
+        var expectation = JsonSchemaExpectation.FromSchemaNode(
+            CreateToolUnionSchema());
+
+        expectation.ExpectedKind.Should().Be(JsonSchemaFieldKind.Object);
+        expectation.PropertyKinds.Should().Contain("name", JsonSchemaFieldKind.String);
+        expectation.PropertyKinds.Should().Contain("arguments", JsonSchemaFieldKind.Object);
+    }
+
+    [Fact]
+    public void TryResolveBranch_SelectsByDiscriminator()
+    {
+        var expectation = JsonSchemaExpectation.FromSchemaNode(
+            CreateToolUnionSchema());
+
+        var resolved = expectation.TryResolveBranch(
+            JsonNode.Parse("""{"name":"emit_files","arguments":{}}""")!);
+
+        resolved.Should().NotBeNull();
+        resolved!.GetProperty("arguments")!.PropertyKinds
+            .Should().Contain("files", JsonSchemaFieldKind.Array);
+    }
+
+    [Fact]
+    public void Accepts_RejectsUndeclaredProperties()
+    {
+        var expectation = JsonSchemaExpectation.FromSchemaNode(
+            CreateToolUnionSchema());
+        var branch = expectation.Branches[0].Expectation.GetProperty("arguments")!;
+
+        branch.Accepts(
+            JsonNode.Parse("""{"files":[],"repo":"x"}""")!)
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void Accepts_AcceptsDeclaredContent()
+    {
+        var expectation = JsonSchemaExpectation.FromSchemaNode(
+            CreateToolUnionSchema());
+        var branch = expectation.Branches[0].Expectation.GetProperty("arguments")!;
+
+        branch.Accepts(
+            JsonNode.Parse(
+                """{"files":[{"path":"A.cs","content":"go"}],"notes":"done"}""")!)
+            .Should().BeTrue();
+    }
+
+    private static JsonNode CreateToolUnionSchema() =>
+        JsonNode.Parse(
+            """
+            {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string", "const": "emit_files" },
+                    "arguments": {
+                      "type": "object",
+                      "properties": {
+                        "files": { "type": "array", "items": { "type": "object" } },
+                        "notes": { "type": "string" }
+                      }
+                    }
+                  },
+                  "required": ["name", "arguments"]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string", "const": "run_shell" },
+                    "arguments": {
+                      "type": "object",
+                      "properties": {
+                        "repo": { "type": "string" },
+                        "count": { "type": "integer" }
+                      }
+                    }
+                  },
+                  "required": ["name", "arguments"]
+                }
+              ]
+            }
+            """)!;
 }

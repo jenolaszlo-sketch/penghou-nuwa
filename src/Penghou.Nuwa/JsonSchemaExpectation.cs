@@ -15,6 +15,15 @@ public sealed record JsonSchemaExpectation(
     bool Nullable = false)
 {
     /// <summary>
+    /// The resolved branches of a <c>oneOf</c>/<c>anyOf</c> union schema, in
+    /// declaration order. Empty when the schema is not a union. Branch-aware
+    /// repair resolves the node against a single branch (via discriminator or
+    /// shape) so content is only repaired using the schema that actually
+    /// matches it.
+    /// </summary>
+    public IReadOnlyList<JsonSchemaBranch> Branches { get; init; } = [];
+
+    /// <summary>
     /// Whether the schema allows the value to be null, either via an explicit
     /// "null" in the type union, a <c>nullable</c> keyword, or an untyped
     /// schema. Used to decide whether an explicit null on an optional property
@@ -60,7 +69,86 @@ public sealed record JsonSchemaExpectation(
         return new JsonSchemaExpectation(
             propertyKinds,
             schema,
-            SchemaAllowsNull(schema));
+            SchemaAllowsNull(schema))
+        {
+            Branches = BuildBranches(schema)
+        };
+    }
+
+    private static IReadOnlyList<JsonSchemaBranch> BuildBranches(
+        JsonNode schema)
+    {
+        if (schema is not JsonObject schemaObject)
+            return [];
+
+        var union = schemaObject["oneOf"] as JsonArray
+            ?? schemaObject["anyOf"] as JsonArray;
+
+        if (union is null || union.Count == 0)
+            return [];
+
+        var branches = new List<JsonSchemaBranch>();
+
+        foreach (var branchNode in union)
+        {
+            if (branchNode is not JsonObject branchObject)
+                continue;
+
+            var (discriminatorProperty, discriminatorValues) =
+                FindDiscriminator(branchObject);
+
+            branches.Add(
+                new JsonSchemaBranch(
+                    FromSchemaNode(branchObject),
+                    discriminatorProperty,
+                    discriminatorValues));
+        }
+
+        return branches;
+    }
+
+    private static (string? Property, IReadOnlySet<string>? Values)
+        FindDiscriminator(JsonObject branch)
+    {
+        if (branch["properties"] is not JsonObject properties)
+            return (null, null);
+
+        foreach (var (propertyName, propertySchema) in properties)
+        {
+            if (propertySchema is not JsonObject propertyObject)
+                continue;
+
+            if (propertyObject["const"] is JsonValue constValue &&
+                constValue.TryGetValue<string>(out var constText) &&
+                !string.IsNullOrWhiteSpace(constText))
+            {
+                return (
+                    propertyName,
+                    new HashSet<string>(
+                        [constText],
+                        StringComparer.Ordinal));
+            }
+
+            if (propertyObject["enum"] is JsonArray enumArray)
+            {
+                var values = enumArray
+                    .OfType<JsonValue>()
+                    .Select(value =>
+                        value.TryGetValue<string>(out var text)
+                            ? text
+                            : null)
+                    .OfType<string>()
+                    .Where(text => !string.IsNullOrWhiteSpace(text))
+                    .ToHashSet(StringComparer.Ordinal);
+
+                if (values.Count > 0)
+                {
+                    return (propertyName, values);
+                }
+            }
+        }
+
+        return (null, null);
     }
 
     private static bool SchemaAllowsNull(JsonNode schema)
@@ -196,6 +284,202 @@ public sealed record JsonSchemaExpectation(
 
         return FromSchemaNode(itemSchema);
     }
+
+    /// <summary>
+    /// Resolves <paramref name="node"/> against this expectation's branches,
+    /// returning the single branch expectation that best matches it, or
+    /// <c>null</c> when the match is ambiguous. Non-union expectations always
+    /// resolve to themselves. Discriminator properties (<c>name</c>,
+    /// <c>tool</c>, <c>function.name</c>) are honored first; otherwise the most
+    /// specific branch whose declared properties cover the node wins.
+    /// </summary>
+    internal JsonSchemaExpectation? TryResolveBranch(
+        JsonNode node)
+    {
+        if (Branches.Count == 0)
+            return this;
+
+        if (node is not JsonObject obj)
+            return null;
+
+        var discriminator = GetDiscriminatorValue(obj);
+
+        if (discriminator is not null)
+        {
+            var matches = Branches
+                .Where(branch =>
+                    branch.DiscriminatorValues?.Contains(
+                        discriminator) == true)
+                .ToList();
+
+            if (matches.Count == 1)
+                return matches[0].Expectation;
+
+            if (matches.Count > 1)
+            {
+                return matches
+                    .OrderBy(branch =>
+                        DeclaredPropertyCount(
+                            branch.Expectation))
+                    .First()
+                    .Expectation;
+            }
+
+            return null;
+        }
+
+        var candidates = Branches
+            .Where(branch =>
+                NodeFitsBranch(
+                    obj,
+                    branch.Expectation))
+            .OrderBy(branch =>
+                DeclaredPropertyCount(
+                    branch.Expectation))
+            .ToList();
+
+        return candidates
+            .FirstOrDefault()
+            ?.Expectation;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="node"/> is structurally consistent with this
+    /// expectation: every present key must be declared, and nested objects and
+    /// arrays must recursively conform. Union expectations accept the node when
+    /// any branch accepts it. Scalars and values pending a deeper
+    /// double-serialization expansion are treated as conforming.
+    /// </summary>
+    internal bool Accepts(JsonNode node)
+    {
+        if (Branches.Count > 0)
+        {
+            return Branches.Any(branch =>
+                branch.Expectation.Accepts(node));
+        }
+
+        return node switch
+        {
+            JsonObject obj => AcceptsObject(obj),
+            JsonArray array => AcceptsArray(array),
+            _ => true
+        };
+    }
+
+    private bool AcceptsObject(JsonObject obj)
+    {
+        if (!HasDeclaredProperties)
+            return true;
+
+        foreach (var (key, value) in obj)
+        {
+            if (!DefinesProperty(key))
+                return false;
+
+            if (value is null ||
+                value is not (JsonObject or JsonArray))
+            {
+                continue;
+            }
+
+            var propertyExpectation = GetProperty(key);
+
+            if (propertyExpectation is not null &&
+                !propertyExpectation.Accepts(value))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool AcceptsArray(JsonArray array)
+    {
+        var itemExpectation = GetItem();
+
+        if (itemExpectation is null)
+            return true;
+
+        foreach (var entry in array)
+        {
+            if (entry is null ||
+                entry is not (JsonObject or JsonArray))
+            {
+                continue;
+            }
+
+            if (!itemExpectation.Accepts(entry))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static string? GetDiscriminatorValue(
+        JsonObject obj)
+    {
+        if (TryGetStringProp(obj, "name", out var name))
+            return name;
+
+        if (TryGetStringProp(obj, "tool", out var tool))
+            return tool;
+
+        if (TryGetStringProp(obj, "function", out var function))
+            return function;
+
+        if (obj["function"] is JsonObject functionObject &&
+            TryGetStringProp(
+                functionObject,
+                "name",
+                out var nestedFunctionName))
+        {
+            return nestedFunctionName;
+        }
+
+        return null;
+    }
+
+    private static bool TryGetStringProp(
+        JsonObject obj,
+        string propertyName,
+        out string value)
+    {
+        value = string.Empty;
+
+        if (obj[propertyName] is JsonValue jsonValue &&
+            jsonValue.TryGetValue<string>(out var text) &&
+            !string.IsNullOrWhiteSpace(text))
+        {
+            value = text;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool NodeFitsBranch(
+        JsonObject obj,
+        JsonSchemaExpectation branch)
+    {
+        if (!branch.HasDeclaredProperties)
+            return obj.Count == 0;
+
+        foreach (var (key, _) in obj)
+        {
+            if (!branch.DefinesProperty(key))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static int DeclaredPropertyCount(
+        JsonSchemaExpectation branch) =>
+        branch.Schema is JsonObject schemaObject &&
+        schemaObject["properties"] is JsonObject properties
+            ? properties.Count
+            : 0;
 
     public IReadOnlySet<string> GetStringPropertyNames()
     {
@@ -439,3 +723,15 @@ public enum JsonSchemaFieldKind
     Object,
     Array
 }
+
+/// <summary>
+/// One branch of a <c>oneOf</c>/<c>anyOf</c> union in a
+/// <see cref="JsonSchemaExpectation"/>. The discriminator property (a
+/// <c>const</c>/<c>enum</c> field) lets branch-aware repair pick the schema
+/// that actually describes a node instead of falling back to a permissive
+/// merged view.
+/// </summary>
+public sealed record JsonSchemaBranch(
+    JsonSchemaExpectation Expectation,
+    string? DiscriminatorProperty = null,
+    IReadOnlySet<string>? DiscriminatorValues = null);

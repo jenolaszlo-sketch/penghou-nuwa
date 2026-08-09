@@ -16,6 +16,13 @@ namespace Penghou.Nuwa;
 /// additionalProperties, nullability) is preserved. External (unresolvable)
 /// <c>$ref</c>s become opaque stubs so the pipeline never crashes on exotic
 /// schemas.
+/// <para>
+/// Union keywords are preserved as well: the <c>oneOf</c>/<c>anyOf</c> array
+/// is kept with each branch normalized in place, and object-shaped branches
+/// contribute their declared properties to the canonical view. This lets the
+/// repair strategies pick a specific branch (via discriminator or shape) while
+/// still reading a merged, backward-compatible top-level schema.
+/// </para>
 /// </remarks>
 internal static class JsonSchemaNormalizer
 {
@@ -123,14 +130,79 @@ internal static class JsonSchemaNormalizer
                     NormalizeNode(additional, depth + 1);
             }
 
+            // Normalize union branches in place so they can be surfaced to the
+            // repair strategies as a per-branch view.
+            NormalizeUnionKeywords(result, depth);
+
             InferType(result, depth);
 
-            result.Remove("oneOf");
-            result.Remove("anyOf");
             result.Remove("allOf");
             result.Remove("enum");
 
             return result;
+        }
+
+        private void NormalizeUnionKeywords(
+            JsonObject result,
+            int depth)
+        {
+            if (result["oneOf"] is JsonArray oneOf)
+            {
+                var normalized =
+                    NormalizeUnionBranches(oneOf, depth);
+
+                if (normalized is not null)
+                {
+                    result["oneOf"] = normalized;
+                }
+                else
+                {
+                    result.Remove("oneOf");
+                }
+
+                return;
+            }
+
+            if (result["anyOf"] is JsonArray anyOf)
+            {
+                var normalized =
+                    NormalizeUnionBranches(anyOf, depth);
+
+                if (normalized is not null)
+                {
+                    result["anyOf"] = normalized;
+                }
+                else
+                {
+                    result.Remove("anyOf");
+                }
+            }
+        }
+
+        private JsonArray? NormalizeUnionBranches(
+            JsonArray union,
+            int depth)
+        {
+            var normalized = new JsonArray();
+
+            foreach (var branch in union)
+            {
+                if (branch is not JsonObject branchObject)
+                {
+                    continue;
+                }
+
+                if (NormalizeNode(
+                        branchObject,
+                        depth + 1) is { } effective)
+                {
+                    normalized.Add(effective);
+                }
+            }
+
+            return normalized.Count > 0
+                ? normalized
+                : null;
         }
 
         private JsonNode Resolve(string reference, int depth)
@@ -336,16 +408,19 @@ internal static class JsonSchemaNormalizer
                 return;
             }
 
-            // Union keywords: collect each branch's effective type.
+            // Union keywords: collect each branch's effective type and fold the
+            // declared shapes of object branches into the canonical view.
             if (result["oneOf"] is JsonArray oneOf)
             {
                 result["type"] = UnionBranchTypes(oneOf, depth);
+                MergeObjectBranches(result, oneOf);
                 return;
             }
 
             if (result["anyOf"] is JsonArray anyOf)
             {
                 result["type"] = UnionBranchTypes(anyOf, depth);
+                MergeObjectBranches(result, anyOf);
                 return;
             }
 
@@ -392,6 +467,89 @@ internal static class JsonSchemaNormalizer
             }
 
             return UnionTypes(types);
+        }
+
+        private static void MergeObjectBranches(
+            JsonObject result,
+            JsonArray branches)
+        {
+            foreach (var branch in branches)
+            {
+                if (branch is not JsonObject branchObject ||
+                    !IncludesObject(branchObject))
+                {
+                    continue;
+                }
+
+                MergeObjectBranchShape(result, branchObject);
+            }
+        }
+
+        private static bool IncludesObject(
+            JsonObject branch)
+        {
+            if (branch["properties"] is not null)
+            {
+                return true;
+            }
+
+            return branch["type"] switch
+            {
+                JsonValue value when
+                    value.TryGetValue<string>(
+                        out var single) =>
+                    single == "object",
+                JsonArray array =>
+                    array.Any(item =>
+                        item is JsonValue itemValue &&
+                        itemValue.TryGetValue<string>(
+                            out var itemType) &&
+                        itemType == "object"),
+                _ => false
+            };
+        }
+
+        private static void MergeObjectBranchShape(
+            JsonObject result,
+            JsonObject branch)
+        {
+            if (branch["properties"] is JsonObject branchProperties)
+            {
+                var merged =
+                    result["properties"] is JsonObject existing
+                        ? existing
+                        : new JsonObject();
+
+                foreach (var (name, value) in branchProperties)
+                {
+                    if (!merged.ContainsKey(name))
+                    {
+                        merged[name] = value?.DeepClone();
+                    }
+                }
+
+                result["properties"] = merged;
+            }
+
+            if (branch["required"] is JsonArray branchRequired)
+            {
+                var required =
+                    result["required"] is JsonArray existing
+                        ? existing
+                        : new JsonArray();
+
+                foreach (var name in branchRequired)
+                {
+                    if (name is null || required.Contains(name))
+                    {
+                        continue;
+                    }
+
+                    required.Add(name.DeepClone());
+                }
+
+                result["required"] = required;
+            }
         }
 
         private static JsonNode UnionTypes(
