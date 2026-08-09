@@ -25,6 +25,12 @@ public sealed class JsonRepairChatClientTests
             ]
         };
 
+    private static ChatOptions StructuredFilesResponse =>
+        new()
+        {
+            ResponseFormat = new ChatResponseFormatJson(_applyPatchSchema)
+        };
+
     [Fact]
     public async Task GetResponseAsync_RepairsWrongShapedFunctionArguments()
     {
@@ -94,7 +100,8 @@ public sealed class JsonRepairChatClientTests
         var client = inner.UseJsonRepair();
         var response = await client.GetResponseAsync(
             [new ChatMessage(ChatRole.User, "list files")],
-            cancellationToken: TestContext.Current.CancellationToken);
+            StructuredFilesResponse,
+            TestContext.Current.CancellationToken);
 
         var text = response.Messages[0].Contents[0]
             .Should().BeOfType<TextContent>().Which;
@@ -121,6 +128,76 @@ public sealed class JsonRepairChatClientTests
         response.Messages[0].Contents[0]
             .Should().BeOfType<TextContent>()
             .Which.Text.Should().Be(prose);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_JsonLookingTextWithoutStructuredRequest_IsUntouched()
+    {
+        const string malformed = "{\"files\":[\"a.txt\" ";
+        var inner = new FakeChatClient(
+            new ChatResponse(
+                new ChatMessage(
+                    ChatRole.Assistant,
+                    [new TextContent(malformed)])));
+
+        var response = await inner.UseJsonRepair().GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "show malformed JSON")],
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        response.Messages[0].Contents[0]
+            .Should().BeOfType<TextContent>()
+            .Which.Text.Should().Be(malformed);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_RepairsMarkdownFenceForStructuredRequest()
+    {
+        var inner = new FakeChatClient(
+            new ChatResponse(
+                new ChatMessage(
+                    ChatRole.Assistant,
+                    [new TextContent("```json\n{\"files\":[\"a.txt\"]}\n```")])));
+
+        var response = await inner.UseJsonRepair().GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "list files")],
+            StructuredFilesResponse,
+            TestContext.Current.CancellationToken);
+
+        var repaired = response.Messages[0].Contents[0]
+            .Should().BeOfType<TextContent>().Which.Text;
+        using var document = JsonDocument.Parse(repaired);
+        document.RootElement.GetProperty("files").GetArrayLength().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_NotifiesCallerAboutRepair()
+    {
+        JsonRepairNotification? notification = null;
+        var inner = new FakeChatClient(
+            new ChatResponse(
+                new ChatMessage(
+                    ChatRole.Assistant,
+                    [new TextContent("{\"files\":[\"a.txt\" ")])));
+        var client = inner.UseJsonRepair(
+            new JsonRepairChatClientOptions
+            {
+                RepairCompleted = (value, _) =>
+                {
+                    notification = value;
+                    return ValueTask.CompletedTask;
+                }
+            });
+
+        await client.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "list files")],
+            StructuredFilesResponse,
+            TestContext.Current.CancellationToken);
+
+        notification.Should().NotBeNull();
+        notification!.Target.Should().Be("response-text");
+        notification.WasRepaired.Should().BeTrue();
+        notification.ShapeStatus.Should().Be(JsonRepairShapeStatus.Matched);
+        notification.TolerantRecovery.Should().NotBeNull();
     }
 
     [Fact]
@@ -187,6 +264,32 @@ public sealed class JsonRepairChatClientTests
             .Should().BeOfType<FunctionCallContent>().Which;
         ((JsonElement)repaired.Arguments!["files"]!).ValueKind
             .Should().Be(JsonValueKind.Array);
+    }
+
+    [Fact]
+    public async Task GetStreamingResponseAsync_RepairsRawFunctionArguments()
+    {
+        var fcc = new FunctionCallContent("call_1", "apply_patch", arguments: null)
+        {
+            Exception = new InvalidOperationException("parse failed"),
+            RawRepresentation = "{\"files\":[\"a.txt\" "
+        };
+        var inner = new FakeChatClient(
+            [new ChatResponseUpdate { Contents = [fcc] }]);
+
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var update in inner.UseJsonRepair().GetStreamingResponseAsync(
+                           [new ChatMessage(ChatRole.User, "apply")],
+                           ToolsWithApplyPatch,
+                           TestContext.Current.CancellationToken))
+        {
+            updates.Add(update);
+        }
+
+        var repaired = updates[0].Contents[0]
+            .Should().BeOfType<FunctionCallContent>().Which;
+        repaired.Arguments.Should().NotBeNull();
+        repaired.Exception.Should().BeNull();
     }
 
     [Fact]

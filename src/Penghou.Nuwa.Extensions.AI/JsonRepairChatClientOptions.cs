@@ -28,12 +28,28 @@ public sealed class JsonRepairChatClientOptions
     public bool RepairResponseText { get; set; } = true;
 
     /// <summary>
+    /// Whether JSON-looking assistant text should be repaired when the request
+    /// did not declare a JSON response format and no expectation resolver
+    /// supplied a schema. Defaults to false to avoid rewriting ordinary chat.
+    /// </summary>
+    public bool RepairJsonLookingTextWithoutResponseFormat { get; set; }
+
+    /// <summary>
+    /// Receives a compact audit after each attempted repair. Payload text is
+    /// deliberately excluded.
+    /// </summary>
+    public Func<JsonRepairNotification, CancellationToken, ValueTask>?
+        RepairCompleted
+    { get; set; }
+
+    /// <summary>
     /// Resolves the schema expectation used to repair a specific function call.
     /// When null, the matching <see cref="AIFunctionDeclaration"/> from
     /// <c>ChatOptions.Tools</c> (by name) supplies the schema.
     /// </summary>
     public Func<FunctionCallContent, JsonSchemaExpectation?>?
-        FunctionCallExpectationResolver { get; set; }
+        FunctionCallExpectationResolver
+    { get; set; }
 
     /// <summary>
     /// Resolves the schema expectation used to repair response text.
@@ -42,5 +58,6 @@ public sealed class JsonRepairChatClientOptions
     /// falls back to schema-less best-effort recovery.
     /// </summary>
     public Func<ChatOptions?, JsonSchemaExpectation?>?
-        TextExpectationResolver { get; set; }
+        TextExpectationResolver
+    { get; set; }
 }

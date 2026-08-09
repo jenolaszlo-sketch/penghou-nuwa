@@ -26,7 +26,7 @@ dotnet add package Penghou.Nuwa
 or pin the version explicitly:
 
 ```xml
-<PackageReference Include="Penghou.Nuwa" Version="0.3.0" />
+<PackageReference Include="Penghou.Nuwa" Version="0.4.0" />
 ```
 
 Targets `net8.0`, `net9.0`, and `net10.0`. For Microsoft.Extensions.AI
@@ -62,6 +62,13 @@ var pipeline = JsonRepairPipeline.Create(options =>
 {
     options.RemoveTextRepair<PseudoCSharpVerbatimStringRepairStrategy>();
     options.DisableSalvageFallback();
+    options.Limits = new JsonRepairLimits
+    {
+        MaxInputLength = 1_000_000,
+        MaxOutputLength = 2_000_000,
+        MaxDepth = 128,
+        MaxCorrections = 10_000
+    };
 });
 ```
 
@@ -100,6 +107,9 @@ using var result = await pipeline.RepairAsync(input, expectation);
 if (result.Succeeded)
 {
     var files = result.GetRootOrThrow()["files"];
+
+    if (result.ShapeStatus == JsonRepairShapeStatus.Mismatched)
+        Console.WriteLine(string.Join(Environment.NewLine, result.ShapeErrors));
 }
 ```
 
@@ -130,6 +140,11 @@ This is intentionally **not** a JSON Schema dialect converter or validator for
 model-facing output; do not feed a `JsonSchemaExpectation.Schema` back to an
 LLM or use it as the authoritative contract for a remote API.
 
+`Succeeded` means Nuwa recovered syntactically valid JSON. When an expectation
+is supplied, `ShapeStatus` separately reports whether the result matches the
+types and required structural shape used during recovery. Use a dedicated JSON
+Schema validator when authoritative dialect validation is required.
+
 ## Microsoft.Extensions.AI integration
 
 The companion package **`Penghou.Nuwa.Extensions.AI`** drops Nuwa repair into
@@ -139,7 +154,7 @@ OpenAI, Ollama, Semantic Kernel, and anything else that exposes an
 has done its work, so you get the fixes without forking provider SDKs.
 
 ```xml
-<PackageReference Include="Penghou.Nuwa.Extensions.AI" Version="0.3.0" />
+<PackageReference Include="Penghou.Nuwa.Extensions.AI" Version="0.4.0" />
 ```
 
 Two things get repaired, transparently:
@@ -152,10 +167,11 @@ Two things get repaired, transparently:
   tool's schema, then swaps in the corrected arguments before your tool
   invocation code sees them. When a provider preserves the raw arguments text
   on the call content, that text is repaired too.
-- **Structured-output text.** Assistant `TextContent` that looks like JSON is
-  repaired with the same pipeline, so a truncated or fenced JSON response is
-  recovered before it reaches your deserializer. When `ChatOptions.ResponseFormat`
-  is a `ChatResponseFormatJson` with a schema, that schema guides repair.
+- **Structured-output text.** Assistant `TextContent` is repaired when
+  `ChatOptions.ResponseFormat` requests JSON, so truncated or fenced JSON is
+  recovered before it reaches your deserializer. When the response format has
+  a schema, that schema guides repair. JSON-looking ordinary chat is unchanged
+  unless `RepairJsonLookingTextWithoutResponseFormat` is enabled.
 
 ### Quick start
 
@@ -225,6 +241,8 @@ IChatClient client = inner.UseJsonRepair(options =>
 - The middleware only rewrites JSON that is actually repaired
   (`JsonRepairResult.WasRepaired`) — already-valid arguments and prose text
   pass through untouched.
+- Set `JsonRepairChatClientOptions.RepairCompleted` to surface the compact
+  repair audit to telemetry or a UI. Payload text is not included.
 - Genuinely malformed tool arguments are recoverable only when the provider
   keeps the raw text on the call content; OpenAI's connector does not, so for
   that specific case the existing parse-failure behavior is preserved.
@@ -265,6 +283,7 @@ foreach (var report in result.TextRepairs)
 }
 
 var winner = result.SucceededBy;   // strategy that produced the final document, if any
+var recovery = result.TolerantRecovery; // token-level corrections, when tolerant parsing ran
 ```
 
 ### Resource management and cancellation

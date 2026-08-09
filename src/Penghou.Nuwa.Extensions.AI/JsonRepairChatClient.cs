@@ -17,10 +17,10 @@ namespace Penghou.Nuwa.Extensions.AI;
 /// breaks your tool invocation.
 /// </para>
 /// <para>
-/// Assistant <see cref="TextContent"/> that looks like JSON is repaired too,
-/// covering structured-output responses returned as text. When a JSON
-/// response format with a schema is configured, that schema guides repair;
-/// otherwise repair is schema-less best-effort.
+/// Assistant <see cref="TextContent"/> is repaired when a JSON response format
+/// is requested, covering structured-output responses returned as text. When
+/// that format carries a schema, the schema guides repair. Schema-less
+/// JSON-looking chat text is only repaired when explicitly enabled.
 /// </para>
 /// <para>
 /// Wire the client through <c>UseJsonRepair()</c> on <see cref="ChatClientBuilder"/>
@@ -31,7 +31,7 @@ namespace Penghou.Nuwa.Extensions.AI;
 public class JsonRepairChatClient : DelegatingChatClient
 {
     private readonly JsonRepairChatClientOptions _options;
-    private readonly JsonRepairPipeline _pipeline;
+    private readonly IJsonRepairPipeline _pipeline;
 
     /// <summary>
     /// Creates a client that wraps <paramref name="innerClient"/> and repairs
@@ -61,13 +61,36 @@ public class JsonRepairChatClient : DelegatingChatClient
     public JsonRepairChatClient(
         IChatClient innerClient,
         JsonRepairChatClientOptions options)
+        : this(
+            innerClient,
+            CreatePipeline(options),
+            options)
+    {
+    }
+
+    private static IJsonRepairPipeline CreatePipeline(
+        JsonRepairChatClientOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return JsonRepairPipeline.Create(options.Configure);
+    }
+
+    /// <summary>
+    /// Creates a client that uses an existing pipeline, including one resolved
+    /// from dependency injection with custom strategy dependencies and logging.
+    /// </summary>
+    public JsonRepairChatClient(
+        IChatClient innerClient,
+        IJsonRepairPipeline pipeline,
+        JsonRepairChatClientOptions? options = null)
         : base(innerClient)
     {
+        ArgumentNullException.ThrowIfNull(pipeline);
+        options ??= new JsonRepairChatClientOptions();
         ArgumentNullException.ThrowIfNull(options);
 
         _options = options;
-        _pipeline = JsonRepairPipeline.Create(
-            options.Configure);
+        _pipeline = pipeline;
     }
 
     /// <inheritdoc />
@@ -129,8 +152,7 @@ public class JsonRepairChatClient : DelegatingChatClient
                 foreach (var content in update.Contents)
                 {
                     if (content is FunctionCallContent fcc &&
-                        !fcc.InformationalOnly &&
-                        fcc.Arguments is not null)
+                        !fcc.InformationalOnly)
                     {
                         await RepairFunctionCallAsync(
                                 fcc,
@@ -231,8 +253,15 @@ public class JsonRepairChatClient : DelegatingChatClient
                 cancellationToken)
             .ConfigureAwait(false);
 
+        await NotifyAsync(
+                $"function:{fcc.Name}",
+                result,
+                cancellationToken)
+            .ConfigureAwait(false);
+
         if (!result.Succeeded ||
             !result.WasRepaired ||
+            result.ShapeStatus == JsonRepairShapeStatus.Mismatched ||
             result.RepairedText is not { } repairedText)
         {
             return;
@@ -266,16 +295,24 @@ public class JsonRepairChatClient : DelegatingChatClient
             return;
         }
 
-        var trimmed = text.Text.TrimStart();
-
-        if (!trimmed.StartsWith('{') && !trimmed.StartsWith('['))
-        {
-            return;
-        }
-
         var expectation =
             _options.TextExpectationResolver?.Invoke(options) ??
             ResolveResponseFormatExpectation(options);
+
+        if (expectation is null &&
+            options?.ResponseFormat is not ChatResponseFormatJson)
+        {
+            if (!_options.RepairJsonLookingTextWithoutResponseFormat)
+                return;
+
+            var trimmed = text.Text.TrimStart();
+            if (!trimmed.StartsWith('{') &&
+                !trimmed.StartsWith('[') &&
+                !trimmed.StartsWith("```", StringComparison.Ordinal))
+            {
+                return;
+            }
+        }
 
         using var result = await _pipeline.RepairAsync(
                 text.Text,
@@ -283,13 +320,38 @@ public class JsonRepairChatClient : DelegatingChatClient
                 cancellationToken)
             .ConfigureAwait(false);
 
+        await NotifyAsync(
+                "response-text",
+                result,
+                cancellationToken)
+            .ConfigureAwait(false);
+
         if (result.Succeeded &&
             result.WasRepaired &&
+            result.ShapeStatus != JsonRepairShapeStatus.Mismatched &&
             result.RepairedText is { } repaired)
         {
             text.Text = repaired;
         }
     }
+
+    private ValueTask NotifyAsync(
+        string target,
+        JsonRepairResult result,
+        CancellationToken cancellationToken) =>
+        _options.RepairCompleted is { } notify
+            ? notify(
+                new JsonRepairNotification(
+                    target,
+                    result.Succeeded,
+                    result.WasRepaired,
+                    result.ShapeStatus,
+                    result.ShapeErrors,
+                    result.TextRepairs,
+                    result.NodeRepairs,
+                    result.TolerantRecovery),
+                cancellationToken)
+            : ValueTask.CompletedTask;
 
     private static JsonSchemaExpectation? ResolveFunctionCallExpectation(
         ChatOptions? options,

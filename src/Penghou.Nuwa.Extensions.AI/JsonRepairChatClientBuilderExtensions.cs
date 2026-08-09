@@ -85,4 +85,32 @@ public static class JsonRepairChatClientBuilderExtensions
             innerClient,
             options);
     }
+
+    /// <summary>Wraps a client using an existing, DI-configured repair pipeline.</summary>
+    public static IChatClient UseJsonRepair(
+        this IChatClient innerClient,
+        IJsonRepairPipeline pipeline,
+        JsonRepairChatClientOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(innerClient);
+        ArgumentNullException.ThrowIfNull(pipeline);
+
+        return new JsonRepairChatClient(innerClient, pipeline, options);
+    }
+
+    /// <summary>Adds an existing, DI-configured repair pipeline as a client stage.</summary>
+    public static ChatClientBuilder UseJsonRepair(
+        this ChatClientBuilder builder,
+        IJsonRepairPipeline pipeline,
+        JsonRepairChatClientOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(pipeline);
+
+        return builder.Use(
+            innerClient => new JsonRepairChatClient(
+                innerClient,
+                pipeline,
+                options));
+    }
 }

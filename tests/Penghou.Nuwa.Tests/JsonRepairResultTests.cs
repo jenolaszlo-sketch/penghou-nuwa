@@ -69,6 +69,23 @@ public sealed class JsonRepairResultTests
     }
 
     [Fact]
+    public void Constructor_RejectsInconsistentRepresentations()
+    {
+        using var document = JsonDocument.Parse("""{"ok":true}""");
+
+        var act = () => new JsonRepairResult(
+            document,
+            JsonNode.Parse("""{"ok":false}"""),
+            originalText: "broken",
+            repairedText: """{"ok":true}""",
+            wasRepaired: true,
+            textRepairs: [],
+            nodeRepairs: []);
+
+        act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public void FailureMessage_IncludesNodeRepairsAndRecoveryOutcome()
     {
         using var result = JsonRepairResult.Failure(

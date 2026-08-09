@@ -179,16 +179,16 @@ internal sealed class TolerantJsonTokenReader(
             var kind = source.AsSpan(
                     start,
                     length) switch
-                {
-                    "true" =>
-                        JsonTokenKind.True,
-                    "false" =>
-                        JsonTokenKind.False,
-                    "null" =>
-                        JsonTokenKind.Null,
-                    _ =>
-                        JsonTokenKind.Identifier
-                };
+            {
+                "true" =>
+                    JsonTokenKind.True,
+                "false" =>
+                    JsonTokenKind.False,
+                "null" =>
+                    JsonTokenKind.Null,
+                _ =>
+                    JsonTokenKind.Identifier
+            };
 
             return new JsonToken(
                 kind,

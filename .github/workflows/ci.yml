@@ -11,6 +11,10 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: [net8.0, net9.0, net10.0]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -28,6 +32,7 @@ jobs:
           dotnet test tests/Penghou.Nuwa.Tests/Penghou.Nuwa.Tests.csproj
           --configuration Release
           --no-restore
+          --framework ${{ matrix.framework }}
           /p:CollectCoverage=true
           /p:CoverletOutput=${{ github.workspace }}/coverage/
           /p:CoverletOutputFormat=cobertura
@@ -39,6 +44,7 @@ jobs:
           dotnet test tests/Penghou.Nuwa.Extensions.AI.Tests/Penghou.Nuwa.Extensions.AI.Tests.csproj
           --configuration Release
           --no-restore
+          --framework ${{ matrix.framework }}
           /p:CollectCoverage=true
           /p:CoverletOutput=${{ github.workspace }}/coverage-ai/
           /p:CoverletOutputFormat=cobertura
@@ -48,8 +54,14 @@ jobs:
       - name: Upload coverage report
         uses: actions/upload-artifact@v6
         with:
-          name: coverage-report
+          name: coverage-report-${{ matrix.framework }}
           path: |
             coverage/
             coverage-ai/
           if-no-files-found: error
+
+      - name: Pack
+        if: matrix.framework == 'net10.0'
+        run: |
+          dotnet pack src/Penghou.Nuwa/Penghou.Nuwa.csproj --configuration Release --no-build --output artifacts
+          dotnet pack src/Penghou.Nuwa.Extensions.AI/Penghou.Nuwa.Extensions.AI.csproj --configuration Release --no-build --output artifacts

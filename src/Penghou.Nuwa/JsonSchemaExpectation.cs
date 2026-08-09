@@ -493,9 +493,28 @@ public sealed record JsonSchemaExpectation(
         return names;
     }
 
-    public IReadOnlyList<string> Validate(JsonNode node)
+    /// <summary>
+    /// Validates the types and required structural shape used by repair. This
+    /// intentionally does not implement every JSON Schema keyword.
+    /// </summary>
+    public IReadOnlyList<string> ValidateShape(JsonNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
+
+        if (Branches.Count > 0)
+        {
+            var branchErrors = Branches
+                .Select(branch => branch.Expectation.ValidateShape(node))
+                .ToList();
+            if (branchErrors.Any(errors => errors.Count == 0))
+                return [];
+
+            return
+            [
+                "$ did not match any oneOf/anyOf branch.",
+                .. branchErrors.OrderBy(errors => errors.Count).First()
+            ];
+        }
 
         if (Schema is null)
             return [];
@@ -504,6 +523,13 @@ public sealed record JsonSchemaExpectation(
         ValidateNode(node, Schema, "$", errors);
         return errors;
     }
+
+    /// <summary>
+    /// Validates the structural subset used by repair. Use a dedicated JSON
+    /// Schema validator when authoritative dialect validation is required.
+    /// </summary>
+    public IReadOnlyList<string> Validate(JsonNode node) =>
+        ValidateShape(node);
 
     private static void ValidateNode(
         JsonNode? value,
@@ -536,6 +562,17 @@ public sealed record JsonSchemaExpectation(
                             propertySchema,
                             $"{path}.{propertyName}",
                             errors);
+                    }
+                }
+
+                if (schemaObject["additionalProperties"] is JsonValue additional &&
+                    additional.TryGetValue<bool>(out var allowed) &&
+                    !allowed)
+                {
+                    foreach (var propertyName in valueObject.Select(property => property.Key))
+                    {
+                        if (!properties.ContainsKey(propertyName))
+                            errors.Add($"{path}.{propertyName} is not declared by the schema.");
                     }
                 }
             }

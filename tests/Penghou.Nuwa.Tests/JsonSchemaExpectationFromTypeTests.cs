@@ -112,7 +112,7 @@ public sealed class JsonSchemaExpectationFromTypeTests
         var payload = JsonNode.Parse(
             """{"address":{"city":"London"},"scores":[1,2,3],"labels":{"a":"b"}}""");
 
-        expectation.Validate(payload!).Should().BeEmpty();
+        expectation.ValidateShape(payload!).Should().BeEmpty();
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public sealed class JsonSchemaExpectationFromTypeTests
         var payload = JsonNode.Parse(
             """{"Address":"not-an-object","Scores":"not-an-array"}""");
 
-        expectation.Validate(payload!).Should().NotBeEmpty();
+        expectation.ValidateShape(payload!).Should().NotBeEmpty();
     }
 
     [Fact]

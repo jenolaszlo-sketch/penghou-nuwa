@@ -48,7 +48,7 @@ public sealed class SchemaGuidedOptionalNullRemovalStrategyTests
             .Be(RepairOutcome.Repaired);
         repaired["taskReplacements"]![0]!.AsObject()
             .ContainsKey("moduleId").Should().BeFalse();
-        expectation.Validate(repaired).Should().BeEmpty();
+        expectation.ValidateShape(repaired).Should().BeEmpty();
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public sealed class SchemaGuidedOptionalNullRemovalStrategyTests
         attempt.Outcome.Should()
             .Be(RepairOutcome.NotApplicable);
         node.AsObject().ContainsKey("value").Should().BeTrue();
-        expectation.Validate(node).Should().ContainSingle();
+        expectation.ValidateShape(node).Should().ContainSingle();
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class SchemaGuidedOptionalNullRemovalStrategyTests
         attempt.Outcome.Should()
             .Be(RepairOutcome.NotApplicable);
         node.AsObject().ContainsKey("value").Should().BeTrue();
-        expectation.Validate(node).Should().BeEmpty();
+        expectation.ValidateShape(node).Should().BeEmpty();
     }
 
     private static NodeRepairAttempt Repair(

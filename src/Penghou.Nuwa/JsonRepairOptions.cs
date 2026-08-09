@@ -24,6 +24,9 @@ public sealed class JsonRepairOptions
         _nodeRepairs.Add(typeof(SchemaGuidedJsonStringExpansionStrategy));
     }
 
+    /// <summary>Resource limits applied to each repair operation.</summary>
+    public JsonRepairLimits Limits { get; set; } = JsonRepairLimits.Default;
+
     /// <summary>
     /// Ordered text-repair strategies that run before tolerant parsing.
     /// </summary>
@@ -119,6 +122,8 @@ public sealed class JsonRepairOptions
 
     internal void Validate()
     {
+        ArgumentNullException.ThrowIfNull(Limits);
+        Limits.Validate();
         ValidateNoDuplicates(_textRepairs, "text repair");
         ValidateNoDuplicates(_salvageRepairs, "salvage repair");
         ValidateNoDuplicates(_nodeRepairs, "node repair");

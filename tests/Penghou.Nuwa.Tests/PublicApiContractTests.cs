@@ -24,8 +24,18 @@ public sealed class PublicApiContractTests
           method System.Threading.Tasks.ValueTask<Penghou.Nuwa.JsonRepairResult> RepairAsync(System.String, Penghou.Nuwa.JsonSchemaExpectation, System.Threading.CancellationToken)
         type Penghou.Nuwa.JsonRepair : static class
           method static System.Threading.Tasks.ValueTask<Penghou.Nuwa.JsonRepairResult> RepairAsync(System.String, Penghou.Nuwa.JsonSchemaExpectation, System.Action<Penghou.Nuwa.JsonRepairOptions>, System.Threading.CancellationToken)
+        type Penghou.Nuwa.JsonRepairLimitException : sealed class : System.Exception, System.Runtime.Serialization.ISerializable
+          ctor(System.String)
+        type Penghou.Nuwa.JsonRepairLimits : sealed class : System.IEquatable<Penghou.Nuwa.JsonRepairLimits>
+          ctor()
+          property Penghou.Nuwa.JsonRepairLimits Default
+          property System.Int32 MaxCorrections
+          property System.Int32 MaxDepth
+          property System.Int32 MaxInputLength
+          property System.Int32 MaxOutputLength
         type Penghou.Nuwa.JsonRepairOptions : sealed class
           ctor()
+          property Penghou.Nuwa.JsonRepairLimits Limits
           property System.Collections.Generic.IReadOnlyList<System.Type> NodeRepairs
           property System.Collections.Generic.IReadOnlyList<System.Type> SalvageRepairs
           property System.Collections.Generic.IReadOnlyList<System.Type> TextRepairs
@@ -42,6 +52,7 @@ public sealed class PublicApiContractTests
           method Penghou.Nuwa.JsonRepairOptions RemoveTextRepair<T>()
         type Penghou.Nuwa.JsonRepairPipeline : sealed class : Penghou.Nuwa.IJsonRepairPipeline
           ctor(System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.ITextRepair>, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.ITextRepair>, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.INodeRepair>, Microsoft.Extensions.Logging.ILogger<Penghou.Nuwa.JsonRepairPipeline>)
+          ctor(System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.ITextRepair>, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.ITextRepair>, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.INodeRepair>, Microsoft.Extensions.Logging.ILogger<Penghou.Nuwa.JsonRepairPipeline>, Penghou.Nuwa.JsonRepairLimits)
           method static Penghou.Nuwa.JsonRepairPipeline Create(System.Action<Penghou.Nuwa.JsonRepairOptions>)
           method System.Threading.Tasks.ValueTask<Penghou.Nuwa.JsonRepairResult> RepairAsync(System.String, Penghou.Nuwa.JsonSchemaExpectation, System.Threading.CancellationToken)
         type Penghou.Nuwa.JsonRepairResult : sealed class : System.IDisposable
@@ -51,9 +62,12 @@ public sealed class PublicApiContractTests
           property System.String OriginalText
           property System.String RepairedText
           property System.Text.Json.Nodes.JsonNode Root
+          property System.Collections.Generic.IReadOnlyList<System.String> ShapeErrors
+          property Penghou.Nuwa.JsonRepairShapeStatus ShapeStatus
           property System.Boolean Succeeded
           property Penghou.Nuwa.StrategyReport SucceededBy
           property System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport> TextRepairs
+          property Penghou.Nuwa.TolerantRecoveryReport TolerantRecovery
           property System.Boolean WasRepaired
           method System.Void Dispose()
           method static Penghou.Nuwa.JsonRepairResult Failure(System.String, System.String, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport>, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport>)
@@ -61,6 +75,10 @@ public sealed class PublicApiContractTests
           method System.String GetRepairedTextOrThrow()
           method System.Text.Json.Nodes.JsonNode GetRootOrThrow()
           method static Penghou.Nuwa.JsonRepairResult Success(System.Text.Json.Nodes.JsonNode, System.String, System.String, System.Boolean, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport>, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport>)
+        type Penghou.Nuwa.JsonRepairShapeStatus : enum : System.Enum, System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+          value NotEvaluated
+          value Matched
+          value Mismatched
         type Penghou.Nuwa.JsonSchemaBranch : sealed class : System.IEquatable<Penghou.Nuwa.JsonSchemaBranch>
           ctor(Penghou.Nuwa.JsonSchemaExpectation, System.String, System.Collections.Generic.IReadOnlySet<System.String>)
           property System.String DiscriminatorProperty
@@ -82,6 +100,7 @@ public sealed class PublicApiContractTests
           method Penghou.Nuwa.JsonSchemaExpectation GetItem()
           method Penghou.Nuwa.JsonSchemaExpectation GetProperty(System.String)
           method System.Collections.Generic.IReadOnlySet<System.String> GetStringPropertyNames()
+          method System.Collections.Generic.IReadOnlyList<System.String> ValidateShape(System.Text.Json.Nodes.JsonNode)
           method System.Collections.Generic.IReadOnlyList<System.String> Validate(System.Text.Json.Nodes.JsonNode)
         type Penghou.Nuwa.JsonSchemaFieldKind : enum : System.Enum, System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
           value String
@@ -145,6 +164,13 @@ public sealed class PublicApiContractTests
           property System.String Note
           property Penghou.Nuwa.RepairOutcome Outcome
           property System.String Repaired
+        type Penghou.Nuwa.TolerantRecoveryReport : sealed class : System.IEquatable<Penghou.Nuwa.TolerantRecoveryReport>
+          ctor(System.Boolean, System.String, System.Int32, System.Int32, System.Collections.Generic.IReadOnlyList<System.String>)
+          property System.Int32 CorrectionCount
+          property System.Collections.Generic.IReadOnlyList<System.String> Corrections
+          property System.String Outcome
+          property System.Int32 SchemaGuidedStringCorrectionCount
+          property System.Boolean Succeeded
         """;
 
     private static string GeneratePublicApiSnapshot()

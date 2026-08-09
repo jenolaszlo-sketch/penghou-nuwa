@@ -15,6 +15,7 @@ public sealed class JsonRepairPipeline
     private readonly IReadOnlyList<ITextRepair> _salvageRepairs;
     private readonly IReadOnlyList<INodeRepair> _nodeRepairs;
     private readonly ILogger<JsonRepairPipeline> _logger;
+    private readonly JsonRepairLimits _limits;
     private readonly TolerantJsonSyntaxTreeParser _tolerantParser =
         new();
 
@@ -23,11 +24,30 @@ public sealed class JsonRepairPipeline
         IReadOnlyList<ITextRepair> salvageRepairs,
         IReadOnlyList<INodeRepair> nodeRepairs,
         ILogger<JsonRepairPipeline> logger)
+        : this(textRepairs, salvageRepairs, nodeRepairs, logger, JsonRepairLimits.Default)
     {
-        _textRepairs = textRepairs;
-        _salvageRepairs = salvageRepairs;
-        _nodeRepairs = nodeRepairs;
+    }
+
+    /// <summary>Initializes a reusable repair pipeline with explicit resource limits.</summary>
+    public JsonRepairPipeline(
+        IReadOnlyList<ITextRepair> textRepairs,
+        IReadOnlyList<ITextRepair> salvageRepairs,
+        IReadOnlyList<INodeRepair> nodeRepairs,
+        ILogger<JsonRepairPipeline> logger,
+        JsonRepairLimits limits)
+    {
+        ArgumentNullException.ThrowIfNull(textRepairs);
+        ArgumentNullException.ThrowIfNull(salvageRepairs);
+        ArgumentNullException.ThrowIfNull(nodeRepairs);
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(limits);
+        limits.Validate();
+
+        _textRepairs = textRepairs.ToArray();
+        _salvageRepairs = salvageRepairs.ToArray();
+        _nodeRepairs = nodeRepairs.ToArray();
         _logger = logger;
+        _limits = limits;
     }
 
     /// <summary>
@@ -50,7 +70,8 @@ public sealed class JsonRepairPipeline
                 options.SalvageRepairs),
             Instantiate<INodeRepair>(
                 options.NodeRepairs),
-            NullLogger<JsonRepairPipeline>.Instance);
+            NullLogger<JsonRepairPipeline>.Instance,
+            options.Limits);
     }
 
     public async ValueTask<JsonRepairResult> RepairAsync(
@@ -59,6 +80,13 @@ public sealed class JsonRepairPipeline
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(input);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (input.Length > _limits.MaxInputLength)
+        {
+            throw new JsonRepairLimitException(
+                $"Input length {input.Length} exceeds the configured maximum of {_limits.MaxInputLength} characters.");
+        }
 
         var stopwatch = Stopwatch.StartNew();
         var result = await RepairCoreAsync(
@@ -104,6 +132,7 @@ public sealed class JsonRepairPipeline
 
         for (var index = 0; index < _textRepairs.Count; index++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var strategy = _textRepairs[index];
             var repair = await TryRepairAsync(
                 strategy,
@@ -168,7 +197,9 @@ public sealed class JsonRepairPipeline
         var tolerantParse =
             _tolerantParser.Parse(
                 current,
-                expectation);
+                expectation,
+                _limits,
+                cancellationToken);
 
         if (tolerantParse.Root is null)
         {
@@ -176,6 +207,7 @@ public sealed class JsonRepairPipeline
 
             for (var index = 0; index < _salvageRepairs.Count; index++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var strategy = _salvageRepairs[index];
                 var repair = await TryRepairAsync(
                     strategy,
@@ -209,7 +241,9 @@ public sealed class JsonRepairPipeline
                 tolerantParse =
                     _tolerantParser.Parse(
                         current,
-                        expectation);
+                        expectation,
+                        _limits,
+                        cancellationToken);
 
                 if (tolerantParse.Root is not null)
                 {
@@ -246,7 +280,9 @@ public sealed class JsonRepairPipeline
                 wasRepaired: false,
                 textReports,
                 [],
-                tolerantParse);
+                tolerantParse,
+                JsonRepairShapeStatus.NotEvaluated,
+                shapeErrors: []);
         }
 
         return await CreateResultAsync(
@@ -275,6 +311,7 @@ public sealed class JsonRepairPipeline
         {
             foreach (var strategy in _nodeRepairs)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 NodeRepairAttempt attempt;
 
                 try
@@ -283,6 +320,14 @@ public sealed class JsonRepairPipeline
                         current,
                         expectation,
                         cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (JsonRepairLimitException)
+                {
+                    throw;
                 }
                 catch (Exception exception)
                 {
@@ -308,11 +353,24 @@ public sealed class JsonRepairPipeline
             }
         }
 
-        var repairedText = current.ToJsonString();
-        var document = JsonDocument.Parse(repairedText);
         var wasRepaired =
             textWasRepaired ||
             nodeWasRepaired;
+        var repairedText = wasRepaired
+            ? current.ToJsonString()
+            : originalText;
+        if (repairedText.Length > _limits.MaxOutputLength)
+        {
+            throw new JsonRepairLimitException(
+                $"Repaired output length {repairedText.Length} exceeds the configured maximum of {_limits.MaxOutputLength} characters.");
+        }
+        var document = JsonDocument.Parse(repairedText);
+        var shapeErrors = expectation?.ValidateShape(current) ?? [];
+        var shapeStatus = expectation is null
+            ? JsonRepairShapeStatus.NotEvaluated
+            : shapeErrors.Count == 0
+                ? JsonRepairShapeStatus.Matched
+                : JsonRepairShapeStatus.Mismatched;
 
         return new JsonRepairResult(
             document,
@@ -322,7 +380,9 @@ public sealed class JsonRepairPipeline
             wasRepaired,
             textReports,
             nodeReports,
-            tolerantParse);
+            tolerantParse,
+            shapeStatus,
+            shapeErrors);
     }
 
     private void LogOutcome(
@@ -332,20 +392,21 @@ public sealed class JsonRepairPipeline
         if (!result.Succeeded)
         {
             _logger.LogWarning(
-                "Malformed JSON could not be repaired in {ElapsedMilliseconds} ms. Text repairs: {@TextRepairs}.",
+                "Malformed JSON could not be repaired in {ElapsedMilliseconds} ms. Text repairs: {TextRepairs}.",
                 elapsedMilliseconds,
-                result.TextRepairs);
+                Summarize(result.TextRepairs));
             return;
         }
 
         if (result.WasRepaired)
         {
             _logger.LogWarning(
-                "Malformed JSON was repaired in {ElapsedMilliseconds} ms. Winner: {Winner}. Text repairs: {@TextRepairs}.",
+                "Malformed JSON was repaired in {ElapsedMilliseconds} ms. Winner: {Winner}. Shape status: {ShapeStatus}. Text repairs: {TextRepairs}.",
                 elapsedMilliseconds,
                 result.SucceededBy?.Name ??
                     "tolerant-recovery",
-                result.TextRepairs);
+                result.ShapeStatus,
+                Summarize(result.TextRepairs));
         }
         else
         {
@@ -396,7 +457,7 @@ public sealed class JsonRepairPipeline
         return new StrategyReport(
             name,
             StrategyStatus.Succeeded,
-            attempt.Repaired,
+            Repaired: null,
             attempt.Note);
     }
 
@@ -440,6 +501,14 @@ public sealed class JsonRepairPipeline
                     cancellationToken),
                 Error: null);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (JsonRepairLimitException)
+        {
+            throw;
+        }
         catch (Exception exception)
         {
             return new RepairResult(
@@ -447,6 +516,11 @@ public sealed class JsonRepairPipeline
                 exception.Message);
         }
     }
+
+    private static string Summarize(IEnumerable<StrategyReport> reports) =>
+        string.Join(
+            ", ",
+            reports.Select(report => $"{report.Name}={report.Status}"));
 
     private static IReadOnlyList<T> Instantiate<T>(
         IReadOnlyList<Type> types)

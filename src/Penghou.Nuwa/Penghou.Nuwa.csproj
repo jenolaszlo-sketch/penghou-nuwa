@@ -5,7 +5,6 @@
 
     <PackageId>Penghou.Nuwa</PackageId>
     <Title>Penghou Nuwa</Title>
-    <Version>0.4.0</Version>
     <Authors>Penghou.Nuwa contributors</Authors>
     <Description>A repair and recovery pipeline for malformed JSON and structured output produced by language models.</Description>
     <PackageTags>json;json-repair;llm;structured-output;tool-calling;ai</PackageTags>

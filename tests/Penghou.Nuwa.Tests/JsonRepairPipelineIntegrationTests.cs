@@ -18,7 +18,7 @@ public sealed class JsonRepairPipelineIntegrationTests
         using var provider = services.BuildServiceProvider();
         var pipeline = provider.GetRequiredService<IJsonRepairPipeline>();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             """
             ```json
             {
@@ -54,7 +54,7 @@ public sealed class JsonRepairPipelineIntegrationTests
             ```
             """;
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateEmitFilesExpectation());
 
@@ -84,7 +84,7 @@ public sealed class JsonRepairPipelineIntegrationTests
             "}]}
             """;
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateEmitFilesExpectation());
 
@@ -111,7 +111,7 @@ public sealed class JsonRepairPipelineIntegrationTests
             }
             """;
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateEmitFilesExpectation());
 

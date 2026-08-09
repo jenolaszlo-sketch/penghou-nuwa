@@ -54,7 +54,8 @@ public static class ServiceCollectionExtensions
                     salvageRepairs,
                     nodeRepairs,
                     serviceProvider.GetRequiredService<
-                        ILogger<JsonRepairPipeline>>());
+                        ILogger<JsonRepairPipeline>>(),
+                    options.Limits);
             });
 
         return services;

@@ -255,6 +255,110 @@ public sealed class JsonRepairPipelineTests
                     "Winner: tolerant-recovery"));
     }
 
+    [Fact]
+    public async Task RepairAsync_PropagatesCancellationFromStrategy()
+    {
+        using var cts = new CancellationTokenSource();
+        var pipeline = new JsonRepairPipeline(
+            [new CancelingStrategy(cts)],
+            [],
+            [],
+            NullLogger<JsonRepairPipeline>.Instance);
+
+        Func<Task> act = async () =>
+        {
+            using var result = await pipeline.RepairAsync("broken", cancellationToken: cts.Token);
+        };
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public void RepairAsync_RejectsInputPastConfiguredLimit()
+    {
+        var pipeline = new JsonRepairPipeline(
+            [],
+            [],
+            [],
+            NullLogger<JsonRepairPipeline>.Instance,
+            new JsonRepairLimits { MaxInputLength = 4 });
+
+        var act = () => Repair(pipeline, "12345");
+
+        act.Should().Throw<JsonRepairLimitException>();
+    }
+
+    [Fact]
+    public void RepairAsync_RejectsRecoveryPastConfiguredDepth()
+    {
+        var pipeline = new JsonRepairPipeline(
+            [],
+            [],
+            [],
+            NullLogger<JsonRepairPipeline>.Instance,
+            new JsonRepairLimits { MaxDepth = 3 });
+
+        var act = () => Repair(pipeline, "[[[[1");
+
+        act.Should().Throw<JsonRepairLimitException>();
+    }
+
+    [Fact]
+    public void RepairAsync_ReportsShapeMismatchSeparatelyFromSyntaxSuccess()
+    {
+        var expectation = JsonSchemaExpectation.FromSchemaJson(
+            """{"type":"object","properties":{"files":{"type":"array"}},"required":["files"]}""")!;
+        var pipeline = JsonRepairPipeline.Create();
+
+        using var result = Repair(pipeline, """{"other":true}""", expectation);
+
+        result.Succeeded.Should().BeTrue();
+        result.ShapeStatus.Should().Be(JsonRepairShapeStatus.Mismatched);
+        result.ShapeErrors.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void RepairAsync_ExposesTolerantRecoveryCorrections()
+    {
+        var pipeline = JsonRepairPipeline.Create();
+
+        using var result = Repair(pipeline, """{"items":[1,2""");
+
+        result.TolerantRecovery.Should().NotBeNull();
+        result.TolerantRecovery!.Succeeded.Should().BeTrue();
+        result.TolerantRecovery.CorrectionCount.Should().BeGreaterThan(0);
+        result.TolerantRecovery.Corrections.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void RepairAsync_ValidInputPreservesOriginalText()
+    {
+        const string input = "{ \"ok\" : true }";
+        var pipeline = JsonRepairPipeline.Create();
+
+        using var result = Repair(pipeline, input);
+
+        result.WasRepaired.Should().BeFalse();
+        result.RepairedText.Should().Be(input);
+    }
+
+    [Fact]
+    public void RepairAsync_LogsNoRepairedPayload()
+    {
+        const string secret = "do-not-log-this-value";
+        var logger = new CapturingLogger();
+        var pipeline = new JsonRepairPipeline(
+            [new RecordingStrategy("repair", "broken", $"{{\"secret\":\"{secret}\"}}", [])],
+            [],
+            [],
+            logger);
+
+        using var result = Repair(pipeline, "broken");
+
+        logger.Messages.Should().NotContain(entry => entry.Message.Contains(secret));
+        result.TextRepairs.Should().OnlyContain(report => report.Repaired == null);
+    }
+
     private static JsonRepairResult Repair(
         IJsonRepairPipeline pipeline,
         string input,
@@ -314,6 +418,21 @@ public sealed class JsonRepairPipelineTests
                 RepairOutcome.NotApplicable,
                 null,
                 "declined"));
+    }
+
+    private sealed class CancelingStrategy(CancellationTokenSource source)
+        : ITextRepair
+    {
+        public string Name => "cancels";
+
+        public ValueTask<TextRepairAttempt> RepairAsync(
+            string input,
+            CancellationToken cancellationToken = default)
+        {
+            source.Cancel();
+            cancellationToken.ThrowIfCancellationRequested();
+            return default;
+        }
     }
 
     private sealed class CapturingLogger

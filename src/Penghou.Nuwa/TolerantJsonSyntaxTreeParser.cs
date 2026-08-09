@@ -12,8 +12,12 @@ internal sealed class TolerantJsonSyntaxTreeParser
 {
     public TolerantJsonSyntaxTreeParseResult Parse(
         string input,
-        JsonSchemaExpectation? expectation = null)
+        JsonSchemaExpectation? expectation,
+        JsonRepairLimits limits,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (string.IsNullOrWhiteSpace(input))
         {
             return new TolerantJsonSyntaxTreeParseResult(
@@ -26,14 +30,19 @@ internal sealed class TolerantJsonSyntaxTreeParser
             var recovery =
                 new TolerantJsonRecoveryParser(
                         input,
-                        expectation)
+                        expectation,
+                        limits,
+                        cancellationToken)
                     .Parse();
 
             if (recovery.Root is not null)
             {
                 return new TolerantJsonSyntaxTreeParseResult(
                     recovery.Root,
-                    DescribeRecovery(recovery));
+                    DescribeRecovery(recovery),
+                    recovery.RepairCount,
+                    recovery.SchemaStringRepairCount,
+                    recovery.Repairs);
             }
 
             return new TolerantJsonSyntaxTreeParseResult(
@@ -47,6 +56,14 @@ internal sealed class TolerantJsonSyntaxTreeParser
                 Root: null,
                 Outcome:
                     $"failed to materialize repaired syntax tree: {ex.Message}");
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (JsonRepairLimitException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

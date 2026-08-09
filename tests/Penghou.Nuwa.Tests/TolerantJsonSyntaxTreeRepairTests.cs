@@ -41,7 +41,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """;
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateEmitFilesExpectation());
 
@@ -81,7 +81,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """;
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateEmitFilesExpectation());
 
@@ -117,7 +117,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """;
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateEmitFilesExpectation());
 
@@ -160,7 +160,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """;
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateEmitFilesExpectation());
 
@@ -214,7 +214,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """;
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateEmitFilesExpectation());
 
@@ -245,7 +245,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """{"files":[{"path":"Program.cs","content":"app.Run();""";
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateEmitFilesExpectation());
 
@@ -268,7 +268,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """{"value":"something something" something"}""";
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateStringValueExpectation());
 
@@ -287,7 +287,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """{"value": var path = @"C:\temp\new";""";
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateStringValueExpectation());
 
@@ -306,7 +306,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """{"value": using Solo.Generated;\nvar name = \"Jeno\";\n"}""";
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateStringValueExpectation());
 
@@ -326,7 +326,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """{"value":"\u0041""";
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateStringValueExpectation());
 
@@ -345,7 +345,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """{"files":[{"path":"a","content":"x"]}""";
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateEmitFilesExpectation());
 
@@ -371,7 +371,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
     {
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateEmitFilesExpectation());
 
@@ -419,7 +419,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """;
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreatePlanningExpectation());
 
@@ -454,7 +454,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """{"outer":{"a":1},"b":2}}""";
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateNestedObjectExpectation());
 
@@ -474,7 +474,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """{"outer":{"a":1},"b":2}""";
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateParentPropertyExpectation());
 
@@ -564,7 +564,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
         result.TolerantParse!.Outcome
             .Should().Contain("ancestor property 'verificationKinds'");
         var root = result.Document!.RootElement;
-        expectation.Validate(
+        expectation.ValidateShape(
                 System.Text.Json.Nodes.JsonNode.Parse(
                     root.GetRawText())!)
             .Should().BeEmpty();
@@ -778,7 +778,7 @@ public sealed class TolerantJsonSyntaxTreeRepairTests
             """;
         var pipeline = CreatePipeline();
 
-        using var result = Repair(pipeline, 
+        using var result = Repair(pipeline,
             input,
             CreateEmitFilesExpectation());
 

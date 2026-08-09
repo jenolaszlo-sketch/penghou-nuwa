@@ -4,5 +4,7 @@ internal interface ITolerantJsonSyntaxTreeParser
 {
     TolerantJsonSyntaxTreeParseResult Parse(
         string input,
-        JsonSchemaExpectation? expectation = null);
+        JsonSchemaExpectation? expectation,
+        JsonRepairLimits limits,
+        CancellationToken cancellationToken);
 }

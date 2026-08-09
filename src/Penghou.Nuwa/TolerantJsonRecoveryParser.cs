@@ -11,7 +11,9 @@ namespace Penghou.Nuwa;
 /// </summary>
 internal sealed class TolerantJsonRecoveryParser(
     string input,
-    JsonSchemaExpectation? expectation)
+    JsonSchemaExpectation? expectation,
+    JsonRepairLimits limits,
+    CancellationToken cancellationToken)
 {
     private readonly TolerantJsonTokenReader _reader =
         new(input);
@@ -25,6 +27,7 @@ internal sealed class TolerantJsonRecoveryParser(
 
     public TolerantJsonRecoveryResult Parse()
     {
+        CheckWork();
         var root = ParseValue(expectation);
 
         if (!root.Succeeded)
@@ -32,6 +35,7 @@ internal sealed class TolerantJsonRecoveryParser(
 
         while (true)
         {
+            CheckWork();
             var trailing = _reader.Peek();
 
             if (trailing.Kind ==
@@ -65,6 +69,7 @@ internal sealed class TolerantJsonRecoveryParser(
     private NodeResult ParseValue(
         JsonSchemaExpectation? currentExpectation)
     {
+        CheckWork();
         var token = _reader.Peek();
         var expectsString =
             currentExpectation?.ExpectedKind ==
@@ -150,6 +155,7 @@ internal sealed class TolerantJsonRecoveryParser(
     private NodeResult ParseObject(
         JsonSchemaExpectation? currentExpectation)
     {
+        EnsureCanEnterContainer();
         _reader.Read();
         _closers.Push(
             JsonTokenKind.ObjectEnd);
@@ -159,6 +165,7 @@ internal sealed class TolerantJsonRecoveryParser(
 
         while (true)
         {
+            CheckWork();
             var token = _reader.Peek();
 
             if (token.Kind ==
@@ -304,6 +311,7 @@ internal sealed class TolerantJsonRecoveryParser(
     private NodeResult ParseArray(
         JsonSchemaExpectation? currentExpectation)
     {
+        EnsureCanEnterContainer();
         _reader.Read();
         _closers.Push(
             JsonTokenKind.ArrayEnd);
@@ -315,6 +323,7 @@ internal sealed class TolerantJsonRecoveryParser(
 
         while (true)
         {
+            CheckWork();
             var token = _reader.Peek();
 
             if (TryFindAncestorPropertyOwner(
@@ -785,7 +794,9 @@ internal sealed class TolerantJsonRecoveryParser(
         var recovery =
             new TolerantJsonRecoveryParser(
                     innerText,
-                    childExpectation)
+                    childExpectation,
+                    limits,
+                    cancellationToken)
                 .Parse();
 
         if (recovery.Root is null ||
@@ -1362,9 +1373,30 @@ internal sealed class TolerantJsonRecoveryParser(
 
     private void Record(
         int position,
-        string action) =>
-        _repairs.Add(
-            $"offset {position}: {action}");
+        string action)
+    {
+        CheckWork();
+        if (_repairs.Count >= limits.MaxCorrections)
+        {
+            throw new JsonRepairLimitException(
+                $"Tolerant recovery exceeded the maximum of {limits.MaxCorrections} corrections.");
+        }
+
+        _repairs.Add($"offset {position}: {action}");
+    }
+
+    private void EnsureCanEnterContainer()
+    {
+        CheckWork();
+        if (_closers.Count >= limits.MaxDepth)
+        {
+            throw new JsonRepairLimitException(
+                $"Tolerant recovery exceeded the maximum nesting depth of {limits.MaxDepth}.");
+        }
+    }
+
+    private void CheckWork() =>
+        cancellationToken.ThrowIfCancellationRequested();
 
     private TolerantJsonRecoveryResult Failed() =>
         new(

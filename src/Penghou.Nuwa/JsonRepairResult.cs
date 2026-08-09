@@ -27,7 +27,9 @@ public sealed class JsonRepairResult
             wasRepaired,
             textRepairs,
             nodeRepairs,
-            tolerantParse: null)
+            tolerantParse: null,
+            JsonRepairShapeStatus.NotEvaluated,
+            shapeErrors: [])
     {
     }
 
@@ -39,16 +41,70 @@ public sealed class JsonRepairResult
         bool wasRepaired,
         IReadOnlyList<StrategyReport> textRepairs,
         IReadOnlyList<StrategyReport> nodeRepairs,
-        TolerantJsonSyntaxTreeParseResult? tolerantParse)
+        TolerantJsonSyntaxTreeParseResult? tolerantParse,
+        JsonRepairShapeStatus shapeStatus,
+        IReadOnlyList<string> shapeErrors)
     {
+        ArgumentNullException.ThrowIfNull(originalText);
+        ArgumentNullException.ThrowIfNull(textRepairs);
+        ArgumentNullException.ThrowIfNull(nodeRepairs);
+        ArgumentNullException.ThrowIfNull(shapeErrors);
+
+        if ((document is null) != (root is null))
+        {
+            throw new ArgumentException(
+                "Document and root must either both be present or both be null.");
+        }
+
+        if (document is not null && repairedText is null)
+        {
+            throw new ArgumentException(
+                "A successful result must include repaired text.",
+                nameof(repairedText));
+        }
+
+        if (document is not null && root is not null && repairedText is not null)
+        {
+            JsonNode? repairedNode;
+            try
+            {
+                repairedNode = JsonNode.Parse(repairedText);
+            }
+            catch (JsonException exception)
+            {
+                throw new ArgumentException(
+                    "Repaired text must contain valid JSON.",
+                    nameof(repairedText),
+                    exception);
+            }
+
+            var documentNode = JsonNode.Parse(document.RootElement.GetRawText());
+            if (!JsonNode.DeepEquals(root, repairedNode) ||
+                !JsonNode.DeepEquals(root, documentNode))
+            {
+                throw new ArgumentException(
+                    "Document, root, and repaired text must represent the same JSON value.");
+            }
+        }
+
+        if (document is null && wasRepaired)
+        {
+            throw new ArgumentException(
+                "A failed result cannot be marked as repaired.",
+                nameof(wasRepaired));
+        }
+
         Document = document;
         Root = root;
         OriginalText = originalText;
         RepairedText = repairedText;
         WasRepaired = wasRepaired;
-        TextRepairs = textRepairs;
-        NodeRepairs = nodeRepairs;
+        TextRepairs = textRepairs.ToArray();
+        NodeRepairs = nodeRepairs.ToArray();
         TolerantParse = tolerantParse;
+        ShapeStatus = shapeStatus;
+        ShapeErrors = shapeErrors.ToArray();
+        TolerantRecovery = tolerantParse?.ToPublicReport();
         SucceededBy =
             nodeRepairs.LastOrDefault(
                 report =>
@@ -121,6 +177,19 @@ public sealed class JsonRepairResult
     public bool Succeeded => Document is not null;
 
     public bool WasRepaired { get; }
+
+    /// <summary>
+    /// Whether the final JSON matches the structural subset of the supplied
+    /// schema expectation. This is shape validation, not full JSON Schema
+    /// dialect validation.
+    /// </summary>
+    public JsonRepairShapeStatus ShapeStatus { get; }
+
+    /// <summary>Structural schema mismatches found in the final JSON.</summary>
+    public IReadOnlyList<string> ShapeErrors { get; }
+
+    /// <summary>Diagnostics from tolerant syntax-tree recovery, when attempted.</summary>
+    public TolerantRecoveryReport? TolerantRecovery { get; }
 
     /// <summary>
     /// The strategy whose output became the final document, or null when no
