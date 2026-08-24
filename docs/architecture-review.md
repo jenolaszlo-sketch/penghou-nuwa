@@ -20,6 +20,27 @@ architecture.
 
 ## P0 — Correctness / robustness risks
 
+> **Resolved since review** — all five P0 findings are fixed
+> (`Harden repair pipeline against unbounded work and data corruption`):
+>
+> 1. The verbatim strategy now carries one shared `MaxTotalExpansions` budget
+>    across the whole recursion and checks cancellation inside candidate loops.
+> 2. Single-quote escapes are decoded consistently (`\n` → newline, `\t`,
+>    `\r`, `\b`, `\f`, `\0`; unknown escapes keep prior behaviour) instead of
+>    silently dropping the backslash.
+> 3. Nested double-encoding parses share the parent's remaining correction
+>    budget and a depth allowance bounded by enclosing depth, plus a hard
+>    `HardMaxDepth = 512` ceiling regardless of configuration.
+> 4. The property lookahead scan is capped at 1024 characters like its twin.
+> 5. The AI decorator only replaces message text when a schema matched or the
+>    repaired output is structurally plausible (object/array root); scalar-only
+>    rewrites of prose are suppressed.
+>
+> Regression coverage: `tests/Penghou.Nuwa.Tests/RepairRobustnessTests.cs`
+> (adversarial termination, shared-budget shape, hard depth cap, escape
+> decoding) and the scalar-prose decorator test in
+> `JsonRepairChatClientTests.cs`.
+
 ### 1. Unbounded speculative search in the verbatim-string strategy
 
 `Strategies/PseudoCSharpVerbatimStringRepairStrategy.cs` (`TryRepairFrom`)
@@ -101,7 +122,7 @@ mutating message content.
 24. **Invalid schema JSON silently null** — `FromSchemaJson` swallows `JsonException` and downgrades schema-guided repair without any diagnostic. Surface it to shape status/notifications.
 25. **Missing `ConfigureAwait(false)`** in pipeline awaits — inconsistent with the Extensions.AI project's discipline.
 26. **Duplicate-key abort vs STJ last-wins** — a repeated property fails whole-object recovery; consider last-wins plus a recorded correction.
-27. **Test gaps** — behavioral coverage missing for `MaxCorrections`, failure-path `MaxOutputLength`, the single-quote escape inconsistency (#2), nested-budget reset (#3), mid-recovery cancellation, and the prose-rewrite case (#5); AI tests omit both expectation resolvers and `RepairJsonLookingTextWithoutResponseFormat`; no fuzz/property-based tests or benchmarks for a parser whose whole job is hostile input.
+27. **Test gaps** — behavioral coverage missing for `MaxCorrections`, failure-path `MaxOutputLength`, mid-recovery cancellation; AI tests omit both expectation resolvers and `RepairJsonLookingTextWithoutResponseFormat`; no fuzz/property-based tests or benchmarks for a parser whose whole job is hostile input. (Escape inconsistency #2, nested-budget reset #3, and the prose-rewrite case #5 now have regression tests.)
 
 ## Release engineering
 
@@ -120,8 +141,8 @@ mutating message content.
 
 ## Suggested priority
 
-1. **P0 robustness**: shared work/cancellation budget across speculative strategies (#1), consistent single-quote escapes (#2), shared nested-parse budget + defensive depth cap (#3).
-2. **AI decorator guard**: require structural plausibility before mutating message text (#5).
-3. **Hot-path bounds + memoization**: cap the property lookahead, memoize tokens (#4/#14).
+1. ~~**P0 robustness**: shared work/cancellation budget across speculative strategies (#1), consistent single-quote escapes (#2), shared nested-parse budget + defensive depth cap (#3).~~ **Done.**
+2. ~~**AI decorator guard**: require structural plausibility before mutating message text (#5).~~ **Done.**
+3. **Hot-path memoization**: property lookahead is now capped (#4); token memoization remains (#14).
 4. **Design cleanup**: injected parser seam, unified phase runner, factory-based options, expectation memoization (#6–#9).
 5. **Ergonomics/tests**: limit exception structure, schema-parse diagnostics, DI self-sufficiency, fuzz tests, missing behavioral tests (#19–#27).
