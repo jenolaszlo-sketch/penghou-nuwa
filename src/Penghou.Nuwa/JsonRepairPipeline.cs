@@ -149,6 +149,7 @@ public sealed class JsonRepairPipeline
 
         var buffer = new StringBuilder();
         var emittedOffset = 0;
+        var scanner = new StablePrefixScanner();
 
         await foreach (var chunk in chunks.WithCancellation(cancellationToken)
                            .ConfigureAwait(false))
@@ -166,10 +167,9 @@ public sealed class JsonRepairPipeline
                     $"Streamed input length {buffer.Length} exceeds the configured maximum of {_limits.MaxInputLength} characters.");
             }
 
-            var stableLength =
-                StablePrefixScanner.FindStableLength(
-                    buffer.ToString(),
-                    emittedOffset);
+            var stableLength = scanner.FindStableLength(
+                buffer,
+                emittedOffset);
 
             if (stableLength > emittedOffset)
             {
@@ -208,69 +208,79 @@ public sealed class JsonRepairPipeline
     /// already-emitted deltas.</item>
     /// </list>
     /// </summary>
-    internal static class StablePrefixScanner
+    internal sealed class StablePrefixScanner
     {
         /// <summary>Characters withheld from emission until more text arrives.</summary>
         internal const int TailHoldback = 16;
 
-        public static int FindStableLength(
-            string buffer,
+        private int scannedLength;
+        private int depth;
+        private bool sawStructure;
+        private bool inString;
+        private bool escaped;
+        private bool inBareToken;
+        private int boundary = -1;
+
+        internal int ScannedCharacterCount { get; private set; }
+
+        public int FindStableLength(
+            StringBuilder buffer,
             int emittedOffset)
         {
             var limit = buffer.Length - TailHoldback;
-            if (limit <= emittedOffset)
+            if (limit <= scannedLength)
             {
                 return emittedOffset;
             }
 
-            var depth = 0;
-            var sawStructure = false;
-            var boundary = -1;
-
-            var index = 0;
+            var index = scannedLength;
             while (index < limit)
             {
+                ScannedCharacterCount++;
                 var current = buffer[index];
+
+                if (inString)
+                {
+                    if (escaped)
+                    {
+                        escaped = false;
+                    }
+                    else if (current == '\\')
+                    {
+                        escaped = true;
+                    }
+                    else if (current == '"')
+                    {
+                        inString = false;
+                        if (depth > 0)
+                        {
+                            boundary = index;
+                        }
+                    }
+
+                    index++;
+                    continue;
+                }
+
+                if (inBareToken)
+                {
+                    if (!char.IsWhiteSpace(current) &&
+                        current is not (',' or '}' or ']' or ':'))
+                    {
+                        index++;
+                        continue;
+                    }
+
+                    boundary = index - 1;
+                    inBareToken = false;
+                }
 
                 switch (current)
                 {
                     case '"':
-                        {
-                            // Skip a complete string literal.
-                            index++;
-                            while (index < limit)
-                            {
-                                if (buffer[index] == '\\')
-                                {
-                                    index += 2;
-                                    continue;
-                                }
-
-                                if (buffer[index] == '"')
-                                {
-                                    break;
-                                }
-
-                                index++;
-                            }
-
-                            if (index >= limit)
-                            {
-                                // Unterminated within the safe region.
-                                return boundary < emittedOffset
-                                    ? emittedOffset
-                                    : Math.Max(boundary + 1, emittedOffset);
-                            }
-
-                            if (depth > 0)
-                            {
-                                boundary = index;
-                                sawStructure = true;
-                            }
-
-                            index++;
-                            break;
-                        }
+                        inString = true;
+                        index++;
+                        break;
                     case '{' or '[':
                         depth++;
                         sawStructure = true;
@@ -287,39 +297,18 @@ public sealed class JsonRepairPipeline
                         index++;
                         break;
                     default:
-                        if (char.IsWhiteSpace(current))
+                        if (!char.IsWhiteSpace(current) &&
+                            sawStructure && depth > 0)
                         {
-                            if (boundary >= 0)
-                            {
-                                boundary = index - 1 < boundary
-                                    ? boundary
-                                    : index - 1;
-                            }
-
-                            index++;
-                            break;
-                        }
-
-                        // Numbers and literals: emit through their end.
-                        if (boundary >= 0 && depth > 0)
-                        {
-                            var tokenEnd = index;
-                            while (tokenEnd < limit &&
-                                   !char.IsWhiteSpace(buffer[tokenEnd]) &&
-                                   buffer[tokenEnd] is not (',' or '}' or ']' or '"' or ':'))
-                            {
-                                tokenEnd++;
-                            }
-
-                            boundary = tokenEnd - 1;
-                            index = tokenEnd;
-                            break;
+                            inBareToken = true;
                         }
 
                         index++;
                         break;
                 }
             }
+
+            scannedLength = limit;
 
             if (!sawStructure ||
                 boundary < emittedOffset)
@@ -332,6 +321,11 @@ public sealed class JsonRepairPipeline
                 ? emittedOffset
                 : Math.Min(boundary + 1, limit);
         }
+
+        public static int FindStableLength(string buffer, int emittedOffset) =>
+            new StablePrefixScanner().FindStableLength(
+                new StringBuilder(buffer),
+                emittedOffset);
     }
 
     private async ValueTask<JsonRepairResult> RepairCoreAsync(

@@ -132,6 +132,7 @@ public sealed class SchemaGuidedEnumFuzzyMatchStrategy
         // Bounded edit distance for typos.
         string? best = null;
         var bestDistance = MaxEditDistance + 1;
+        var hasTie = false;
         foreach (var member in allowed)
         {
             var distance = Levenshtein(
@@ -143,10 +144,16 @@ public sealed class SchemaGuidedEnumFuzzyMatchStrategy
             {
                 best = member;
                 bestDistance = distance;
+                hasTie = false;
+            }
+            else if (distance <= MaxEditDistance &&
+                     distance == bestDistance)
+            {
+                hasTie = true;
             }
         }
 
-        if (best is not null)
+        if (best is not null && !hasTie)
         {
             matched = best;
             return true;

@@ -182,6 +182,19 @@ public sealed class JsonRepairResult
             score *= 0.6;
         }
 
+        // Extraction strategies deliberately discard surrounding or trailing
+        // content. Treat that as materially less certain than transport-only
+        // normalization such as removing a Markdown fence.
+        if (textRepairs.Any(
+                report =>
+                    report.Status == StrategyStatus.Succeeded &&
+                    report.Name is "concatenated-json" or
+                        "prose-wrapper-extraction" or
+                        "xml-wrapped-extraction"))
+        {
+            score *= 0.7;
+        }
+
         if (shapeStatus ==
             JsonRepairShapeStatus.Mismatched)
         {

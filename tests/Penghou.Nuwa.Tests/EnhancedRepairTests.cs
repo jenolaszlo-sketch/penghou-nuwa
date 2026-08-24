@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FluentAssertions;
 using Penghou.Nuwa.Strategies;
 
@@ -87,6 +88,20 @@ public sealed class EnhancedRepairTests
         result.Root!["ok"]!.GetValue<bool>().Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData("<answer>{\"ok\":true}</answering>")]
+    [InlineData("prose <answer>{\"ok\":true}</answer>")]
+    public async Task XmlWrapper_RequiresExactWholeMessageBoundary(string input)
+    {
+        var strategy = new XmlWrappedExtractionStrategy();
+
+        var attempt = await strategy.RepairAsync(
+            input,
+            TestContext.Current.CancellationToken);
+
+        attempt.Outcome.Should().Be(RepairOutcome.NotApplicable);
+    }
+
     [Fact]
     public async Task CdataWrappedPayload_IsExtracted()
     {
@@ -112,6 +127,7 @@ public sealed class EnhancedRepairTests
         result.Succeeded.Should().BeTrue();
         result.Root!["first"].Should().NotBeNull();
         result.Root!.AsObject().Should().ContainSingle();
+        result.Confidence.Should().BeLessThan(0.8);
     }
 
     [Fact]
@@ -234,6 +250,16 @@ public sealed class EnhancedRepairTests
             TestContext.Current.CancellationToken);
 
         result.Root!["status"]!.GetValue<string>().Should().Be("Active");
+    }
+
+    [Fact]
+    public void Coercions_AmbiguousEnumTypo_IsNotGuessed()
+    {
+        SchemaGuidedEnumFuzzyMatchStrategy.TryMatchEnum(
+                JsonNode.Parse("""{"enum":["cat","bat"]}"""),
+                "hat",
+                out _)
+            .Should().BeFalse();
     }
 
     [Fact]
@@ -360,6 +386,24 @@ public sealed class EnhancedRepairTests
 
         buffer[stable].Should().NotBe('e');
         buffer[..stable].Should().NotEndWith("open stri");
+    }
+
+    [Fact]
+    public void StablePrefixScanner_ProcessesEachCharacterOnceAcrossChunks()
+    {
+        const string input =
+            "{\"items\":[1,2,3,4,5,6,7,8,9],\"ok\":true}";
+        var scanner = new JsonRepairPipeline.StablePrefixScanner();
+        var buffer = new System.Text.StringBuilder();
+
+        foreach (var character in input)
+        {
+            buffer.Append(character);
+            scanner.FindStableLength(buffer, emittedOffset: 0);
+        }
+
+        scanner.ScannedCharacterCount.Should().Be(
+            input.Length - JsonRepairPipeline.StablePrefixScanner.TailHoldback);
     }
 
     private static async IAsyncEnumerable<string> ToChunks(

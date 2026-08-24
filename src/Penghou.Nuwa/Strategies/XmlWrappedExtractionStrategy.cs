@@ -49,6 +49,11 @@ public sealed class XmlWrappedExtractionStrategy
             return false;
         }
 
+        if (!IsPayloadBoundary(input[..openingStart], 0))
+        {
+            return false;
+        }
+
         var nameEnd = input.IndexOf('>', openingStart + 1);
         if (nameEnd < 0)
         {
@@ -67,11 +72,10 @@ public sealed class XmlWrappedExtractionStrategy
 
         var bodyStart = nameEnd + 1;
 
-        var closingTag = "</" + tagName;
-        var closingStart = input.IndexOf(
-            closingTag,
+        var closingStart = FindClosingTag(
+            input,
             bodyStart,
-            StringComparison.OrdinalIgnoreCase);
+            tagName);
         if (closingStart < 0)
         {
             return false;
@@ -88,6 +92,38 @@ public sealed class XmlWrappedExtractionStrategy
 
         return IsPayloadBoundary(input, SkipClosingTag(input, closingStart)) &&
                !string.IsNullOrEmpty(payload);
+    }
+
+    private static int FindClosingTag(
+        string input,
+        int start,
+        string tagName)
+    {
+        var candidate = "</" + tagName;
+        var search = start;
+        while (search < input.Length)
+        {
+            var match = input.IndexOf(
+                candidate,
+                search,
+                StringComparison.OrdinalIgnoreCase);
+            if (match < 0)
+                return -1;
+
+            var suffix = match + candidate.Length;
+            while (suffix < input.Length &&
+                   input[suffix] is ' ' or '\t' or '\r' or '\n')
+            {
+                suffix++;
+            }
+
+            if (suffix < input.Length && input[suffix] == '>')
+                return match;
+
+            search = match + 2;
+        }
+
+        return -1;
     }
 
     private static int SkipClosingTag(
