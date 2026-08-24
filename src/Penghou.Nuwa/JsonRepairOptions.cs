@@ -131,6 +131,62 @@ public sealed class JsonRepairOptions
         return this;
     }
 
+    /// <summary>
+    /// Enables conservative reconciliation of unknown property names to
+    /// uniquely matching missing required schema properties. The strategy
+    /// never overwrites an existing target and runs before coercion or
+    /// unknown-property pruning regardless of configuration call order.
+    /// </summary>
+    public JsonRepairOptions EnableRequiredPropertyReconciliation()
+    {
+        var strategyType =
+            typeof(SchemaGuidedRequiredPropertyReconciliationStrategy);
+        if (_nodeRepairs.Contains(strategyType))
+            return this;
+
+        var coercionTypes = new HashSet<Type>
+        {
+            typeof(SchemaGuidedArrayWrapStrategy),
+            typeof(SchemaGuidedStringToNumberCoercionStrategy),
+            typeof(SchemaGuidedStringToBooleanCoercionStrategy),
+            typeof(SchemaGuidedEnumFuzzyMatchStrategy),
+            typeof(SchemaGuidedUnknownPropertyPruneStrategy)
+        };
+        var insertionIndex = _nodeRepairs.FindIndex(coercionTypes.Contains);
+        _nodeRepairs.Insert(
+            insertionIndex < 0 ? _nodeRepairs.Count : insertionIndex,
+            strategyType);
+        return this;
+    }
+
+    /// <summary>
+    /// Enables broader reconciliation based on a uniquely identifying nested
+    /// object shape, array-item shape, or exact enum membership. Primitive
+    /// type compatibility alone never qualifies. This policy is separate from
+    /// strong-name reconciliation because property names may be unrelated.
+    /// </summary>
+    public JsonRepairOptions EnableStructuralPropertyReconciliation()
+    {
+        var strategyType =
+            typeof(SchemaGuidedStructuralPropertyReconciliationStrategy);
+        if (_nodeRepairs.Contains(strategyType))
+            return this;
+
+        var coercionTypes = new HashSet<Type>
+        {
+            typeof(SchemaGuidedArrayWrapStrategy),
+            typeof(SchemaGuidedStringToNumberCoercionStrategy),
+            typeof(SchemaGuidedStringToBooleanCoercionStrategy),
+            typeof(SchemaGuidedEnumFuzzyMatchStrategy),
+            typeof(SchemaGuidedUnknownPropertyPruneStrategy)
+        };
+        var insertionIndex = _nodeRepairs.FindIndex(coercionTypes.Contains);
+        _nodeRepairs.Insert(
+            insertionIndex < 0 ? _nodeRepairs.Count : insertionIndex,
+            strategyType);
+        return this;
+    }
+
     public JsonRepairOptions AddNodeRepair<T>() where T : class, INodeRepair
     {
         _nodeRepairs.Add(typeof(T));

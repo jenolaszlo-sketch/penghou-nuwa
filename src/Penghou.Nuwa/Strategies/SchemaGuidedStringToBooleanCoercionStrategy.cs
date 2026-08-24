@@ -82,7 +82,8 @@ public sealed class SchemaGuidedStringToBooleanCoercionStrategy
                     JsonSchemaFieldKind.Boolean &&
                     TryCoerceBoolean(
                         propertyText,
-                        out var coerced))
+                        out var coerced) &&
+                    propertyExpectation.ValidateShape(coerced).Count == 0)
                 {
                     jsonObject[property.Key] = coerced;
                     changed = true;
@@ -109,7 +110,8 @@ public sealed class SchemaGuidedStringToBooleanCoercionStrategy
                     JsonSchemaFieldKind.Boolean &&
                     TryCoerceBoolean(
                         itemText,
-                        out var coercedItem))
+                        out var coercedItem) &&
+                    itemExpectation.ValidateShape(coercedItem).Count == 0)
                 {
                     jsonArray[index] = coercedItem;
                     changed = true;
@@ -123,7 +125,7 @@ public sealed class SchemaGuidedStringToBooleanCoercionStrategy
         return changed;
     }
 
-    private static bool TryCoerceBoolean(
+    internal static bool TryCoerceBoolean(
         string text,
         out JsonNode coerced)
     {

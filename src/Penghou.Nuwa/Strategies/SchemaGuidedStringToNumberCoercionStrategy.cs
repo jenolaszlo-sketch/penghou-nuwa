@@ -6,8 +6,9 @@ namespace Penghou.Nuwa.Strategies;
 /// <summary>
 /// Converts string values to numbers where the schema requires a number and
 /// the model emitted a quoted literal, e.g. <c>"42"</c> → <c>42</c>. Integral
-/// strings become <see cref="long"/> values when they fit; anything else
-/// becomes a <see cref="double"/> parsed with the invariant culture.
+/// strings become <see cref="long"/> values when they fit; finite decimal
+/// values become <see cref="decimal"/>. Values outside those lossless ranges
+/// are left unchanged.
 /// </summary>
 public sealed class SchemaGuidedStringToNumberCoercionStrategy
     : INodeRepair
@@ -34,7 +35,8 @@ public sealed class SchemaGuidedStringToNumberCoercionStrategy
             JsonSchemaFieldKind.Number &&
             TryCoerceNumber(
                 text,
-                out var coerced))
+                out var coerced) &&
+            effective.ValidateShape(coerced).Count == 0)
         {
             return new(new NodeRepairAttempt(
                 RepairOutcome.Repaired,
@@ -77,7 +79,8 @@ public sealed class SchemaGuidedStringToNumberCoercionStrategy
                     JsonSchemaFieldKind.Number &&
                     TryCoerceNumber(
                         propertyText,
-                        out var coercedProperty))
+                        out var coercedProperty) &&
+                    propertyExpectation.ValidateShape(coercedProperty).Count == 0)
                 {
                     jsonObject[property.Key] = coercedProperty;
                     changed = true;
@@ -104,7 +107,8 @@ public sealed class SchemaGuidedStringToNumberCoercionStrategy
                     JsonSchemaFieldKind.Number &&
                     TryCoerceNumber(
                         itemText,
-                        out var coercedItem))
+                        out var coercedItem) &&
+                    itemExpectation.ValidateShape(coercedItem).Count == 0)
                 {
                     jsonArray[index] = coercedItem;
                     changed = true;
@@ -140,14 +144,13 @@ public sealed class SchemaGuidedStringToNumberCoercionStrategy
             return true;
         }
 
-        if (double.TryParse(
+        if (decimal.TryParse(
                 candidate,
                 NumberStyles.Float,
                 CultureInfo.InvariantCulture,
-                out var floating) &&
-            double.IsFinite(floating))
+                out var fractional))
         {
-            coerced = JsonValue.Create(floating);
+            coerced = JsonValue.Create(fractional);
             return true;
         }
 

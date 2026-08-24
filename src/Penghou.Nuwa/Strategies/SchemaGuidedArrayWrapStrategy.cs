@@ -27,13 +27,17 @@ public sealed class SchemaGuidedArrayWrapStrategy
             expectation;
 
         // Root-level scalar where an array is required.
-        if (node is not (JsonObject or JsonArray) &&
-            effective.ExpectedKind ==
-            JsonSchemaFieldKind.Array)
+        if (node is not JsonArray &&
+            effective.ExpectedKind == JsonSchemaFieldKind.Array &&
+            effective.GetItem() is { } rootItemExpectation &&
+            SchemaGuidedValueConversion.TryPrepareValue(
+                node,
+                rootItemExpectation,
+                out var rootItem))
         {
             return new(new NodeRepairAttempt(
                 RepairOutcome.Repaired,
-                new JsonArray(node.DeepClone())));
+                new JsonArray(rootItem)));
         }
 
         var repaired = node.DeepClone();
@@ -62,10 +66,15 @@ public sealed class SchemaGuidedArrayWrapStrategy
 
                 if (propertyExpectation?.ExpectedKind ==
                         JsonSchemaFieldKind.Array &&
-                    property.Value is not JsonArray)
+                    property.Value is not JsonArray &&
+                    propertyExpectation.GetItem() is { } propertyItemExpectation &&
+                    SchemaGuidedValueConversion.TryPrepareValue(
+                        property.Value,
+                        propertyItemExpectation,
+                        out var propertyItem))
                 {
                     jsonObject[property.Key] =
-                        new JsonArray(property.Value.DeepClone());
+                        new JsonArray(propertyItem);
                     changed = true;
                     continue;
                 }
@@ -90,9 +99,14 @@ public sealed class SchemaGuidedArrayWrapStrategy
 
                 if (itemExpectation?.ExpectedKind ==
                         JsonSchemaFieldKind.Array &&
-                    item is not JsonArray)
+                    item is not JsonArray &&
+                    itemExpectation.GetItem() is { } nestedItemExpectation &&
+                    SchemaGuidedValueConversion.TryPrepareValue(
+                        item,
+                        nestedItemExpectation,
+                        out var nestedItem))
                 {
-                    jsonArray[index] = new JsonArray(item.DeepClone());
+                    jsonArray[index] = new JsonArray(nestedItem);
                     changed = true;
                     continue;
                 }

@@ -191,12 +191,45 @@ var pipeline = JsonRepairPipeline.Create(options =>
 
 // {"count": "42"}      -> {"count": 42}        string-to-number
 // {"flag": "True"}     -> {"flag": true}       string-to-boolean
-// {"tags": "red"}      -> {"tags": ["red"]}    array wrap
+// {"tags": "red"}      -> {"tags": ["red"]}    item-compatible array wrap
 // {"status": "Actve"}  -> {"status": "Active"} enum fuzzy match (distance <= 2)
 // extra properties     -> removed              when additionalProperties:false
 ```
 
 Off by default; repairs stay structurally conservative unless you opt in.
+Scalar-to-array wrapping validates the proposed element against the complete
+`items` schema first. A deterministic string-to-number or string-to-boolean
+conversion may be applied atomically; incompatible values remain unchanged.
+
+Missing required properties can also be reconciled from a uniquely matching
+unknown property name:
+
+```csharp
+var pipeline = JsonRepairPipeline.Create(options =>
+    options.EnableRequiredPropertyReconciliation());
+
+// {"qurey":"weather"} -> {"query":"weather"}
+```
+
+This policy is opt-in and conservative: the target must be required and
+missing, the source must be unknown, the name match must be uniquely best,
+and the value must satisfy the target schema directly or through a certified
+lossless coercion. Existing properties are never overwritten, and ambiguous
+union branches are left unchanged.
+
+For contracts with distinctive nested shapes or enum values, a broader policy
+can reconcile unrelated property names:
+
+```csharp
+var pipeline = JsonRepairPipeline.Create(options =>
+    options.EnableStructuralPropertyReconciliation());
+```
+
+This remains separately opt-in. It requires exactly one compatible missing
+required target, refuses primitive type compatibility by itself, and applies
+the mapping only when supported schema-shape errors decrease. Repair reports
+include privacy-safe evidence such as the path, reason, uniqueness decision,
+and before/after error counts; property values are not included.
 
 ### Repair confidence
 
@@ -486,6 +519,11 @@ public sealed class MyNodeStrategy : INodeRepair
     }
 }
 ```
+
+## Roadmap
+
+See the [roadmap](ROADMAP.md) for planned conservative schema reconciliation
+and coercion hardening.
 
 ## Feedback and attribution
 

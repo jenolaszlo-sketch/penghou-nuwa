@@ -272,7 +272,19 @@ public sealed record JsonSchemaExpectation(
             string.Equals(
                 name,
                 propertyName,
-                StringComparison.Ordinal));
+            StringComparison.Ordinal));
+
+    internal IReadOnlyList<string> GetRequiredPropertyNames() =>
+        Schema is JsonObject schemaObject &&
+        schemaObject["required"] is JsonArray required
+            ? required
+                .OfType<JsonValue>()
+                .Select(value => value.TryGetValue<string>(out var name) ? name : null)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Cast<string>()
+                .Distinct(StringComparer.Ordinal)
+                .ToArray()
+            : [];
 
     public JsonSchemaExpectation? GetItem()
     {
