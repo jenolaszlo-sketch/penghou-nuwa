@@ -29,7 +29,8 @@ public sealed class JsonRepairResult
             nodeRepairs,
             tolerantParse: null,
             JsonRepairShapeStatus.NotEvaluated,
-            shapeErrors: [])
+            shapeErrors: [],
+            validateConsistency: true)
     {
     }
 
@@ -44,6 +45,33 @@ public sealed class JsonRepairResult
         TolerantJsonSyntaxTreeParseResult? tolerantParse,
         JsonRepairShapeStatus shapeStatus,
         IReadOnlyList<string> shapeErrors)
+        : this(
+            document,
+            root,
+            originalText,
+            repairedText,
+            wasRepaired,
+            textRepairs,
+            nodeRepairs,
+            tolerantParse,
+            shapeStatus,
+            shapeErrors,
+            validateConsistency: false)
+    {
+    }
+
+    private JsonRepairResult(
+        JsonDocument? document,
+        JsonNode? root,
+        string originalText,
+        string? repairedText,
+        bool wasRepaired,
+        IReadOnlyList<StrategyReport> textRepairs,
+        IReadOnlyList<StrategyReport> nodeRepairs,
+        TolerantJsonSyntaxTreeParseResult? tolerantParse,
+        JsonRepairShapeStatus shapeStatus,
+        IReadOnlyList<string> shapeErrors,
+        bool validateConsistency)
     {
         ArgumentNullException.ThrowIfNull(originalText);
         ArgumentNullException.ThrowIfNull(textRepairs);
@@ -63,7 +91,8 @@ public sealed class JsonRepairResult
                 nameof(repairedText));
         }
 
-        if (document is not null && root is not null && repairedText is not null)
+        if (validateConsistency &&
+            document is not null && root is not null && repairedText is not null)
         {
             JsonNode? repairedNode;
             try

@@ -19,8 +19,7 @@ public sealed class JsonRepairPipeline
     private readonly ILogger<JsonRepairPipeline> _logger;
     private readonly JsonRepairLimits _limits;
     private readonly bool _allowTruncationSalvage;
-    private readonly TolerantJsonSyntaxTreeParser _tolerantParser =
-        new();
+    private readonly ITolerantJsonSyntaxTreeParser _tolerantParser;
 
     public JsonRepairPipeline(
         IReadOnlyList<ITextRepair> textRepairs,
@@ -73,6 +72,27 @@ public sealed class JsonRepairPipeline
         _logger = logger;
         _limits = limits;
         _allowTruncationSalvage = allowTruncationSalvage;
+        _tolerantParser = new TolerantJsonSyntaxTreeParser();
+    }
+
+    internal JsonRepairPipeline(
+        IReadOnlyList<ITextRepair> textRepairs,
+        IReadOnlyList<ITextRepair> salvageRepairs,
+        IReadOnlyList<INodeRepair> nodeRepairs,
+        ILogger<JsonRepairPipeline> logger,
+        JsonRepairLimits limits,
+        bool allowTruncationSalvage,
+        ITolerantJsonSyntaxTreeParser tolerantParser)
+        : this(
+            textRepairs,
+            salvageRepairs,
+            nodeRepairs,
+            logger,
+            limits,
+            allowTruncationSalvage)
+    {
+        ArgumentNullException.ThrowIfNull(tolerantParser);
+        _tolerantParser = tolerantParser;
     }
 
     /// <summary>
@@ -500,6 +520,7 @@ public sealed class JsonRepairPipeline
 
         if (tolerantParse.Root is null)
         {
+            EnsureOutputWithinLimit(current);
             return new JsonRepairResult(
                 document: null,
                 root: null,
@@ -569,7 +590,8 @@ public sealed class JsonRepairPipeline
 
                 var report = ReportNodeAttempt(
                     strategy.Name,
-                    attempt);
+                    attempt,
+                    current);
                 nodeReports.Add(report);
 
                 if (report.Status != StrategyStatus.Succeeded)
@@ -598,11 +620,7 @@ public sealed class JsonRepairPipeline
         var repairedText = wasRepaired
             ? current.ToJsonString()
             : originalText;
-        if (repairedText.Length > _limits.MaxOutputLength)
-        {
-            throw new JsonRepairLimitException(
-                $"Repaired output length {repairedText.Length} exceeds the configured maximum of {_limits.MaxOutputLength} characters.");
-        }
+        EnsureOutputWithinLimit(repairedText);
         var document = JsonDocument.Parse(repairedText);
         var shapeErrors = expectation?.ValidateShape(current) ?? [];
         var shapeStatus = expectation is null
@@ -622,6 +640,15 @@ public sealed class JsonRepairPipeline
             tolerantParse,
             shapeStatus,
             shapeErrors);
+    }
+
+    private void EnsureOutputWithinLimit(string output)
+    {
+        if (output.Length > _limits.MaxOutputLength)
+        {
+            throw new JsonRepairLimitException(
+                $"Repaired output length {output.Length} exceeds the configured maximum of {_limits.MaxOutputLength} characters.");
+        }
     }
 
     private static int CountNodeCorrections(
@@ -766,7 +793,8 @@ public sealed class JsonRepairPipeline
 
     private static StrategyReport ReportNodeAttempt(
         string name,
-        NodeRepairAttempt attempt)
+        NodeRepairAttempt attempt,
+        JsonNode current)
     {
         if (attempt.Outcome == RepairOutcome.NotApplicable)
         {
@@ -777,7 +805,8 @@ public sealed class JsonRepairPipeline
         }
 
         if (attempt.Outcome == RepairOutcome.Failed ||
-            attempt.Repaired is null)
+            attempt.Repaired is null ||
+            JsonNode.DeepEquals(attempt.Repaired, current))
         {
             return new StrategyReport(
                 name,

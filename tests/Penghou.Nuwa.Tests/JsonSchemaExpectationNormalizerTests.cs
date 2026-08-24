@@ -296,6 +296,21 @@ public sealed class JsonSchemaExpectationNormalizerTests
     }
 
     [Fact]
+    public void FactoryExpectation_MemoizesChildAndItemExpectations()
+    {
+        var expectation = JsonSchemaExpectation.FromSchemaJson(
+            """{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"}}}}}}""")!;
+
+        var firstProperty = expectation.GetProperty("items");
+        var secondProperty = expectation.GetProperty("items");
+        var firstItem = firstProperty!.GetItem();
+        var secondItem = firstProperty.GetItem();
+
+        firstProperty.Should().BeSameAs(secondProperty);
+        firstItem.Should().BeSameAs(secondItem);
+    }
+
+    [Fact]
     public void FromSchemaNode_UnionRootKeepsCanonicalShape()
     {
         var expectation = JsonSchemaExpectation.FromSchemaNode(

@@ -14,6 +14,12 @@ public sealed record JsonSchemaExpectation(
     JsonNode? Schema = null,
     bool Nullable = false)
 {
+    private IReadOnlyDictionary<string, JsonSchemaExpectation>?
+        CachedProperties
+    { get; init; }
+
+    private JsonSchemaExpectation? CachedItem { get; init; }
+
     /// <summary>
     /// The resolved branches of a <c>oneOf</c>/<c>anyOf</c> union schema, in
     /// declaration order. Empty when the schema is not a union. Branch-aware
@@ -66,14 +72,37 @@ public sealed record JsonSchemaExpectation(
             }
         }
 
-        return new JsonSchemaExpectation(
+        var expectation = new JsonSchemaExpectation(
             propertyKinds,
             schema,
             SchemaAllowsNull(schema))
         {
-            Branches = BuildBranches(schema)
+            Branches = BuildBranches(schema),
+            CachedProperties = BuildPropertyExpectations(schema),
+            CachedItem = BuildItemExpectation(schema)
         };
+        return expectation;
     }
+
+    private static IReadOnlyDictionary<string, JsonSchemaExpectation>
+        BuildPropertyExpectations(JsonNode schema) =>
+        schema is JsonObject schemaObject &&
+        schemaObject["properties"] is JsonObject properties
+            ? properties
+                .Where(property => property.Value is not null)
+                .ToDictionary(
+                    property => property.Key,
+                    property => FromSchemaNode(property.Value!),
+                    StringComparer.Ordinal)
+            : new Dictionary<string, JsonSchemaExpectation>(
+                StringComparer.Ordinal);
+
+    private static JsonSchemaExpectation? BuildItemExpectation(
+        JsonNode schema) =>
+        schema is JsonObject schemaObject &&
+        schemaObject["items"] is { } itemSchema
+            ? FromSchemaNode(itemSchema)
+            : null;
 
     private static IReadOnlyList<JsonSchemaBranch> BuildBranches(
         JsonNode schema)
@@ -233,6 +262,11 @@ public sealed record JsonSchemaExpectation(
         ArgumentException.ThrowIfNullOrWhiteSpace(
             propertyName);
 
+        if (CachedProperties is not null)
+        {
+            return CachedProperties.GetValueOrDefault(propertyName);
+        }
+
         if (Schema is not JsonObject schemaObject ||
             schemaObject["properties"] is not
                 JsonObject properties ||
@@ -288,6 +322,9 @@ public sealed record JsonSchemaExpectation(
 
     public JsonSchemaExpectation? GetItem()
     {
+        if (CachedItem is not null)
+            return CachedItem;
+
         if (Schema is not JsonObject schemaObject ||
             schemaObject["items"] is not { } itemSchema)
         {

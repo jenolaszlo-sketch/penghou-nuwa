@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Penghou.Nuwa.Strategies;
+using System.Text.Json.Nodes;
 
 namespace Penghou.Nuwa.Tests;
 
@@ -289,6 +290,26 @@ public sealed class JsonRepairPipelineTests
     }
 
     [Fact]
+    public void RepairAsync_AppliesOutputLimitToFailedRepairText()
+    {
+        var pipeline = new JsonRepairPipeline(
+            [new RecordingStrategy("expand", "broken", new string('x', 20), [])],
+            [],
+            [],
+            NullLogger<JsonRepairPipeline>.Instance,
+            new JsonRepairLimits
+            {
+                MaxInputLength = 100,
+                MaxOutputLength = 10
+            });
+
+        var act = () => Repair(pipeline, "broken");
+
+        act.Should().Throw<JsonRepairLimitException>()
+            .WithMessage("*output length 20*");
+    }
+
+    [Fact]
     public void RepairAsync_RejectsRecoveryPastConfiguredDepth()
     {
         var pipeline = new JsonRepairPipeline(
@@ -348,6 +369,44 @@ public sealed class JsonRepairPipelineTests
         result.TolerantRecovery!.Succeeded.Should().BeTrue();
         result.TolerantRecovery.CorrectionCount.Should().BeGreaterThan(0);
         result.TolerantRecovery.Corrections.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void RepairAsync_UsesInjectedTolerantParser()
+    {
+        var parser = new RecordingTolerantParser();
+        var pipeline = new JsonRepairPipeline(
+            [],
+            [],
+            [],
+            NullLogger<JsonRepairPipeline>.Instance,
+            JsonRepairLimits.Default,
+            allowTruncationSalvage: true,
+            parser);
+
+        using var result = Repair(pipeline, "broken");
+
+        parser.CallCount.Should().Be(1);
+        result.Root!["fromParser"]!.GetValue<bool>().Should().BeTrue();
+    }
+
+    [Fact]
+    public void RepairAsync_DoesNotCreditNodeStrategyThatReturnsUnchangedTree()
+    {
+        var pipeline = new JsonRepairPipeline(
+            [],
+            [],
+            [new UnchangedNodeStrategy()],
+            NullLogger<JsonRepairPipeline>.Instance);
+        var expectation = JsonSchemaExpectation.FromSchemaJson(
+            """{"type":"object"}""")!;
+
+        using var result = Repair(pipeline, """{"value":true}""", expectation);
+
+        result.WasRepaired.Should().BeFalse();
+        result.SucceededBy.Should().BeNull();
+        result.NodeRepairs.Should().ContainSingle()
+            .Which.Status.Should().Be(StrategyStatus.Failed);
     }
 
     [Fact]
@@ -476,5 +535,37 @@ public sealed class JsonRepairPipelineTests
         {
             Messages.Add((logLevel, formatter(state, exception)));
         }
+    }
+
+    private sealed class RecordingTolerantParser
+        : ITolerantJsonSyntaxTreeParser
+    {
+        public int CallCount { get; private set; }
+
+        public TolerantJsonSyntaxTreeParseResult Parse(
+            string input,
+            JsonSchemaExpectation? expectation,
+            JsonRepairLimits limits,
+            CancellationToken cancellationToken,
+            bool allowTruncationSalvage = false)
+        {
+            CallCount++;
+            return new TolerantJsonSyntaxTreeParseResult(
+                JsonNode.Parse("""{"fromParser":true}"""),
+                "injected");
+        }
+    }
+
+    private sealed class UnchangedNodeStrategy : INodeRepair
+    {
+        public string Name => "unchanged";
+
+        public ValueTask<NodeRepairAttempt> RepairAsync(
+            JsonNode node,
+            JsonSchemaExpectation expectation,
+            CancellationToken cancellationToken = default) =>
+            new(new NodeRepairAttempt(
+                RepairOutcome.Repaired,
+                node.DeepClone()));
     }
 }

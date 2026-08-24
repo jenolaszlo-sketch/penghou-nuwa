@@ -81,10 +81,18 @@ Completed as a compatible, independently reviewable milestone.
 Implement these separately from the usability milestone because they affect
 construction, execution, or hot-path behavior.
 
+Completed in the first architecture slice:
+
+- The tolerant parser is an injected pipeline dependency with a default.
+- Factory-created schema expectations memoize property and item expectations;
+  direct public-constructor instances retain uncached mutable-schema behavior.
+- Token lookahead memoizes lexing by source offset.
+- Trusted internal result construction avoids redundant consistency reparsing.
+- Unchanged node-strategy output no longer receives causal success credit.
+- Failure output is subject to the same output limit as successful repair.
+
 ### Parser and strategy construction
 
-- Use the existing `ITolerantJsonSyntaxTreeParser` seam as an injected pipeline
-  dependency with a default implementation.
 - Design factory or instance-based strategy registration to replace the
   fewest-constructor reflection heuristic without breaking existing fluent
   configuration.
@@ -93,8 +101,6 @@ construction, execution, or hot-path behavior.
 
 ### Schema expectation reuse
 
-- Memoize property and item expectations so recursive repair does not
-  repeatedly normalize the same schema nodes.
 - Define cache ownership and mutation semantics first because `Schema` is
   currently publicly reachable as a mutable `JsonNode`.
 - Cache AI tool expectations by tool identity and schema identity where the
@@ -102,24 +108,17 @@ construction, execution, or hot-path behavior.
 
 ### Parsing and allocation performance
 
-- Add lazy token memoization so repeated lookahead does not re-lex the same
-  offsets.
 - Replace repeated string reconstruction in template/verbatim strategies with
   bounded single-pass builders where benchmarks show value.
 - Reuse parse results inside salvage strategies.
 - Avoid full-tree clones for node strategies that can determine
   `NotApplicable` with a dry run.
-- Remove redundant `JsonNode` serialization/parsing on trusted internal
-  success paths while keeping validation on public factories.
 - Add adversarial benchmarks before and after each hot-path optimization.
 
 ### Unified limits and causality
 
 - Extend the shared operation context to text-strategy work where iteration or
   speculative search is not already explicitly bounded.
-- Ensure failure results cannot bypass output limits.
-- Make `SucceededBy` identify the strategy that causally changed the accepted
-  artifact rather than relying on report position.
 
 ## Later public API design
 

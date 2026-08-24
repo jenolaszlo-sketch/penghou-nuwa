@@ -8,6 +8,11 @@
 internal sealed class TolerantJsonTokenReader(
     string source)
 {
+    private readonly Dictionary<int, (JsonToken Token, int NextPosition)>
+        _tokenCache = [];
+
+    internal int TokenizationCount { get; private set; }
+
     public string Source { get; } =
         source ??
         throw new ArgumentNullException(
@@ -43,9 +48,7 @@ internal sealed class TolerantJsonTokenReader(
              index <= distance;
              index++)
         {
-            token = ReadToken(
-                Source,
-                ref position);
+            token = ReadTokenCached(ref position);
         }
 
         return token;
@@ -54,10 +57,23 @@ internal sealed class TolerantJsonTokenReader(
     public JsonToken Read()
     {
         var position = Position;
-        var token = ReadToken(
-            Source,
-            ref position);
+        var token = ReadTokenCached(ref position);
         Position = position;
+        return token;
+    }
+
+    private JsonToken ReadTokenCached(ref int position)
+    {
+        var start = position;
+        if (_tokenCache.TryGetValue(start, out var cached))
+        {
+            position = cached.NextPosition;
+            return cached.Token;
+        }
+
+        var token = ReadToken(Source, ref position);
+        _tokenCache[start] = (token, position);
+        TokenizationCount++;
         return token;
     }
 
