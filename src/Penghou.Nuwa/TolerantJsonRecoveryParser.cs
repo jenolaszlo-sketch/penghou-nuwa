@@ -9,17 +9,12 @@ namespace Penghou.Nuwa;
 /// while using container state, bounded token lookahead, and the schema at the
 /// current path to recover punctuation without inventing semantic values.
 /// </summary>
-internal sealed class TolerantJsonRecoveryParser(
-    string input,
-    JsonSchemaExpectation? expectation,
-    JsonRepairLimits limits,
-    CancellationToken cancellationToken)
+internal sealed class TolerantJsonRecoveryParser
 {
     /// <summary>Hard ceiling on nesting depth regardless of configuration, because each open container consumes CLR stack.</summary>
     internal const int HardMaxDepth = 512;
 
-    private readonly TolerantJsonTokenReader _reader =
-        new(input);
+    private readonly TolerantJsonTokenReader _reader;
     private readonly Stack<JsonTokenKind> _closers =
         new();
     private readonly Stack<JsonSchemaExpectation?>
@@ -27,32 +22,55 @@ internal sealed class TolerantJsonRecoveryParser(
     private readonly List<string> _repairs =
         [];
     private int _schemaStringRepairCount;
-    private readonly int maxDepth =
-        Math.Min(limits.MaxDepth, HardMaxDepth);
-    private readonly int maxCorrections =
-        Math.Min(limits.MaxCorrections, HardMaxCorrections);
+    private readonly JsonSchemaExpectation? expectation;
+    private readonly JsonRepairLimits limits;
+    private readonly CancellationToken cancellationToken;
+    private readonly int maxDepth;
+    private readonly CorrectionBudget correctionBudget;
 
-    /// <summary>Creates a nested parser that shares a bounded slice of the parent's correction budget.</summary>
     internal TolerantJsonRecoveryParser(
         string input,
         JsonSchemaExpectation? expectation,
         JsonRepairLimits limits,
-        int remainingCorrectionBudget,
-        int depthAllowance,
         CancellationToken cancellationToken)
         : this(
             input,
             expectation,
-            limits with
-            {
-                MaxCorrections = Math.Min(limits.MaxCorrections, Math.Max(1, remainingCorrectionBudget)),
-                MaxDepth = Math.Min(limits.MaxDepth, Math.Max(1, depthAllowance))
-            },
+            limits,
+            Math.Min(limits.MaxDepth, HardMaxDepth),
+            new CorrectionBudget(Math.Min(limits.MaxCorrections, HardMaxCorrections)),
             cancellationToken)
     {
     }
 
+    private TolerantJsonRecoveryParser(
+        string input,
+        JsonSchemaExpectation? expectation,
+        JsonRepairLimits limits,
+        int depthAllowance,
+        CorrectionBudget correctionBudget,
+        CancellationToken cancellationToken)
+    {
+        _reader = new TolerantJsonTokenReader(input);
+        this.expectation = expectation;
+        this.limits = limits;
+        this.cancellationToken = cancellationToken;
+        maxDepth = Math.Min(depthAllowance, HardMaxDepth);
+        this.correctionBudget = correctionBudget;
+    }
+
     private const int HardMaxCorrections = 100_000;
+
+    private sealed class CorrectionBudget(int remaining)
+    {
+        public bool TryConsume()
+        {
+            if (remaining <= 0)
+                return false;
+            remaining--;
+            return true;
+        }
+    }
 
     public TolerantJsonRecoveryResult Parse()
     {
@@ -616,10 +634,10 @@ internal sealed class TolerantJsonRecoveryParser(
         while (!_reader.IsAtEnd)
         {
             var current = _reader.Current;
-            _reader.AdvanceCharacter();
 
             if (current == '\'')
             {
+                _reader.AdvanceCharacter();
                 Record(
                     opening.Start,
                     "converted single-quoted string");
@@ -628,27 +646,14 @@ internal sealed class TolerantJsonRecoveryParser(
                         value.ToString()));
             }
 
-            // Decode common escapes instead of appending the next raw
-            // character, which silently corrupted input (\n became "n").
-            if (current == '\\' &&
-                !_reader.IsAtEnd)
+            if (current == '\\')
             {
-                var escaped = _reader.Current;
-                value.Append(escaped switch
-                {
-                    'n' => '\n',
-                    't' => '\t',
-                    'r' => '\r',
-                    'b' => '\b',
-                    'f' => '\f',
-                    '0' => '\0',
-                    var other => other
-                });
-                _reader.AdvanceCharacter();
+                AppendEscapedCharacter(value, allowSingleQuote: true);
                 continue;
             }
 
             value.Append(current);
+            _reader.AdvanceCharacter();
         }
 
         return NodeResult.Failed;
@@ -747,7 +752,8 @@ internal sealed class TolerantJsonRecoveryParser(
     }
 
     private void AppendEscapedCharacter(
-        StringBuilder target)
+        StringBuilder target,
+        bool allowSingleQuote = false)
     {
         _reader.AdvanceCharacter();
 
@@ -762,6 +768,7 @@ internal sealed class TolerantJsonRecoveryParser(
 
         switch (escaped)
         {
+            case '\'' when allowSingleQuote:
             case '"':
             case '\\':
             case '/':
@@ -838,10 +845,9 @@ internal sealed class TolerantJsonRecoveryParser(
                 innerText,
                 childExpectation,
                 limits,
-                remainingCorrectionBudget:
-                    maxCorrections - _repairs.Count,
                 depthAllowance:
-                    Math.Max(1, maxDepth - _closers.Count),
+                    maxDepth - _closers.Count,
+                correctionBudget,
                 cancellationToken)
             .Parse();
 
@@ -853,6 +859,7 @@ internal sealed class TolerantJsonRecoveryParser(
             return null;
         }
 
+        _repairs.AddRange(recovery.Repairs);
         _schemaStringRepairCount++;
         return recovery.Root;
     }
@@ -1429,10 +1436,10 @@ internal sealed class TolerantJsonRecoveryParser(
         string action)
     {
         CheckWork();
-        if (_repairs.Count >= maxCorrections)
+        if (!correctionBudget.TryConsume())
         {
             throw new JsonRepairLimitException(
-                $"Tolerant recovery exceeded the maximum of {maxCorrections} corrections.");
+                $"Tolerant recovery exceeded the maximum of {Math.Min(limits.MaxCorrections, HardMaxCorrections)} corrections.");
         }
 
         _repairs.Add($"offset {position}: {action}");
