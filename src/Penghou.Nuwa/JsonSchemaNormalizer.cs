@@ -137,7 +137,17 @@ internal static class JsonSchemaNormalizer
             InferType(result, depth);
 
             result.Remove("allOf");
-            result.Remove("enum");
+
+            // Enum member lists are retained (string members only) so
+            // coercion strategies can fuzzy-match near-miss values. The
+            // canonical type form is still inferred above.
+            if (result["enum"] is JsonArray enumArray &&
+                enumArray.Any(member =>
+                    member is not null &&
+                    member is not JsonValue))
+            {
+                result.Remove("enum");
+            }
 
             return result;
         }

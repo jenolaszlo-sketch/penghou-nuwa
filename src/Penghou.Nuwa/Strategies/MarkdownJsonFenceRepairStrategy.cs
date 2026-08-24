@@ -264,16 +264,64 @@ public sealed class MarkdownJsonFenceRepairStrategy
     private static bool IsJsonLanguage(
         ReadOnlySpan<char> language)
     {
-        return language.Equals(
-                   "json",
-                   StringComparison.OrdinalIgnoreCase) ||
-               language.Equals(
-                   "jsonc",
-                   StringComparison.OrdinalIgnoreCase) ||
-               language.Equals(
-                   "application/json",
-                   StringComparison.OrdinalIgnoreCase);
+        // Known JSON aliases always qualify.
+        if (language.Equals("json", StringComparison.OrdinalIgnoreCase) ||
+            language.Equals("jsonc", StringComparison.OrdinalIgnoreCase) ||
+            language.Equals("application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (language.Length == 0 || language.Length > 24)
+        {
+            return false;
+        }
+
+        // Programming-language tags wrap code, not payloads.
+        if (IsCodeLanguageTag(language))
+        {
+            return false;
+        }
+
+        // Models tag JSON payload fences with arbitrary single-token labels
+        // (tool_call, function_call, ...). Any identifier-shaped token is
+        // accepted; the fence only unwraps transport, and downstream phases
+        // still validate the body.
+        foreach (var current in language)
+        {
+            if (!char.IsLetterOrDigit(current) &&
+                current is not ('-' or '_' or '.' or '/'))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
+
+    private static bool IsCodeLanguageTag(
+        ReadOnlySpan<char> language)
+    {
+        foreach (var candidate in CodeLanguageTags)
+        {
+            if (language.Equals(
+                    candidate.AsSpan(),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static readonly string[] CodeLanguageTags =
+    [
+        "csharp", "cs", "c", "cpp", "python", "py", "javascript", "js",
+        "typescript", "ts", "java", "rust", "go", "ruby", "bash", "shell",
+        "sh", "sql", "html", "css", "xml", "yaml", "yml", "powershell",
+        "ps1", "kotlin", "swift", "php", "perl", "lua", "dart", "scala"
+    ];
 
     private static int SkipLeadingWhitespaceAndBom(
         string input)

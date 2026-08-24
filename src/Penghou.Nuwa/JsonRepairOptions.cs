@@ -17,6 +17,10 @@ public sealed class JsonRepairOptions
     public JsonRepairOptions()
     {
         _textRepairs.Add(typeof(MarkdownJsonFenceRepairStrategy));
+        _textRepairs.Add(typeof(UnicodeDelimiterNormalizationStrategy));
+        _textRepairs.Add(typeof(XmlWrappedExtractionStrategy));
+        _textRepairs.Add(typeof(ConcatenatedJsonExtractionStrategy));
+        _textRepairs.Add(typeof(ProseWrapperExtractionStrategy));
         _textRepairs.Add(typeof(PseudoCSharpVerbatimStringRepairStrategy));
         _textRepairs.Add(typeof(PseudoJavaScriptTemplateStringRepairStrategy));
         _salvageRepairs.Add(typeof(SalvageRepairStrategy));
@@ -24,8 +28,18 @@ public sealed class JsonRepairOptions
         _nodeRepairs.Add(typeof(SchemaGuidedJsonStringExpansionStrategy));
     }
 
-    /// <summary>Resource limits applied to each repair operation.</summary>
+    /// <summary>
+    /// Resource limits applied to each repair operation.
+    /// </summary>
     public JsonRepairLimits Limits { get; set; } = JsonRepairLimits.Default;
+
+    /// <summary>
+    /// Whether input that ends mid-value (a truncated generation) may be
+    /// salvaged by dropping the incomplete trailing property or element while
+    /// keeping everything before it. The dropped fragment is always recorded
+    /// as a tolerant-recovery correction. Defaults to <c>true</c>.
+    /// </summary>
+    public bool AllowTruncationSalvage { get; set; } = true;
 
     /// <summary>
     /// Ordered text-repair strategies that run before tolerant parsing.
@@ -87,6 +101,33 @@ public sealed class JsonRepairOptions
     public JsonRepairOptions DisableSalvageFallback()
     {
         _salvageRepairs.Clear();
+        return this;
+    }
+
+    /// <summary>
+    /// Registers the schema-guided coercion strategies: array wrapping,
+    /// string-to-number and string-to-boolean conversion, enum fuzzy
+    /// matching, and unknown-property pruning for strict contracts. Off by
+    /// default so repairs stay structurally conservative; enable when the
+    /// wire schema is authoritative and typed coercion is acceptable.
+    /// </summary>
+    public JsonRepairOptions EnableSchemaCoercions()
+    {
+        foreach (var strategyType in new[]
+                 {
+                     typeof(SchemaGuidedArrayWrapStrategy),
+                     typeof(SchemaGuidedStringToNumberCoercionStrategy),
+                     typeof(SchemaGuidedStringToBooleanCoercionStrategy),
+                     typeof(SchemaGuidedEnumFuzzyMatchStrategy),
+                     typeof(SchemaGuidedUnknownPropertyPruneStrategy)
+                 })
+        {
+            if (!_nodeRepairs.Contains(strategyType))
+            {
+                _nodeRepairs.Add(strategyType);
+            }
+        }
+
         return this;
     }
 

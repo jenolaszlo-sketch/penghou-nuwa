@@ -26,7 +26,7 @@ dotnet add package Penghou.Nuwa
 or pin the version explicitly:
 
 ```xml
-<PackageReference Include="Penghou.Nuwa" Version="0.5.0" />
+<PackageReference Include="Penghou.Nuwa" Version="0.6.0" />
 ```
 
 Targets `net8.0`, `net9.0`, and `net10.0`. For Microsoft.Extensions.AI
@@ -145,6 +145,94 @@ is supplied, `ShapeStatus` separately reports whether the result matches the
 types and required structural shape used during recovery. Use a dedicated JSON
 Schema validator when authoritative dialect validation is required.
 
+## New in 0.6: truncation salvage, payload extraction, coercions, confidence, streaming
+
+### Truncation-aware partial salvage
+
+Generations cut off mid-payload no longer fail outright. Every complete
+property or element is kept and the torn tail is dropped (recorded as a
+correction):
+
+```csharp
+using var result = await pipeline.RepairAsync("""{"count": 42, "note": """);
+// Succeeded == true; Root == {"count": 42}
+// result.TolerantRecovery.Corrections notes the dropped property.
+```
+
+Disable with `options.AllowTruncationSalvage = false` when partial payloads
+are worse than failures.
+
+### Payload extraction
+
+Models routinely wrap JSON in prose, XML elements, or emit several objects
+back to back. Default text strategies now handle these before parsing:
+
+- `"Here is the JSON: {...}"` — prose prefix/suffix stripping
+  (`prose-wrapper-extraction`)
+- `<answer>{...}</answer>` and CDATA bodies (`xml-wrapped-extraction`)
+- `{"first": 1}{"second": 2}` — concatenated values keep the first object
+  (`concatenated-json`)
+- Fences tagged with arbitrary payload labels (```` ```tool_call ````) are
+  unwrapped; programming-language fences (`csharp`, `python`, ...) remain
+  untouched.
+
+Unicode delimiters are normalized too: curly quotes used as string bounds,
+full-width CJK brackets/colons/commas, BOM and zero-width characters
+(`unicode-delimiter-normalization`).
+
+### Schema-guided coercions (opt-in)
+
+When the wire schema is authoritative, typed coercion can rescue common
+near-misses:
+
+```csharp
+var pipeline = JsonRepairPipeline.Create(options =>
+    options.EnableSchemaCoercions());
+
+// {"count": "42"}      -> {"count": 42}        string-to-number
+// {"flag": "True"}     -> {"flag": true}       string-to-boolean
+// {"tags": "red"}      -> {"tags": ["red"]}    array wrap
+// {"status": "Actve"}  -> {"status": "Active"} enum fuzzy match (distance <= 2)
+// extra properties     -> removed              when additionalProperties:false
+```
+
+Off by default; repairs stay structurally conservative unless you opt in.
+
+### Repair confidence
+
+Every result carries a deterministic heuristic 0–1 score derived from its own
+diagnostics — unchanged valid JSON scores 1.0, each mutation reduces it, and
+lossy salvage or a shape mismatch reduce it sharply:
+
+```csharp
+if (result.IsConfident(0.8))
+{
+    // gate downstream execution like any constrained extractor would
+}
+```
+
+`JsonRepairNotification.Confidence` surfaces the same value to the
+Microsoft.Extensions.AI middleware audit.
+
+### Streaming repair
+
+Repair a payload as chunks arrive. Stable-prefix deltas give consumers a live
+preview; one completed event carries the authoritative result:
+
+```csharp
+await foreach (var streamEvent in pipeline.RepairStreamAsync(modelChunks))
+{
+    if (streamEvent is JsonRepairStreamDelta delta)
+        RenderPreview(delta.Offset, delta.Text);   // verbatim input slice
+    else if (streamEvent is JsonRepairStreamCompleted completed)
+        Use(completed.Result);                      // full repair outcome
+}
+```
+
+Deltas never appear inside open strings and keep a holdback margin from the
+tail so pending punctuation repairs cannot invalidate them — treat them as
+preview only.
+
 ## Microsoft.Extensions.AI integration
 
 The companion package **`Penghou.Nuwa.Extensions.AI`** drops Nuwa repair into
@@ -154,7 +242,7 @@ OpenAI, Ollama, Semantic Kernel, and anything else that exposes an
 has done its work, so you get the fixes without forking provider SDKs.
 
 ```xml
-<PackageReference Include="Penghou.Nuwa.Extensions.AI" Version="0.5.0" />
+<PackageReference Include="Penghou.Nuwa.Extensions.AI" Version="0.6.0" />
 ```
 
 Two things get repaired, transparently:
@@ -252,21 +340,25 @@ IChatClient client = inner.UseJsonRepair(options =>
 Repair runs through up to four stages:
 
 1. **Text-repair strategies** — targeted rewrites of malformed *text* that
-   cannot be a tree yet: Markdown JSON fences, C# verbatim strings
-   (`@"..."`), and JavaScript template literals (`` `...` ``). Stops as soon
-   as the text parses.
+   cannot be a tree yet: Markdown JSON fences (including arbitrary payload
+   tags), prose wrappers, XML/CDATA elements, concatenated values, Unicode
+   delimiter normalization, C# verbatim strings (`@"..."`), and JavaScript
+   template literals (`` `...` ``). Stops as soon as the text parses.
 2. **Tolerant syntax-tree recovery** — a handwritten parser that builds a
    `JsonNode` while using container state, bounded lookahead, and the schema
    at the current path to recover punctuation (missing commas, closers,
-   quotes, unquoted keys) without inventing semantic values.
+   quotes, unquoted keys) without inventing semantic values. Truncated
+   generations are salvaged by keeping every completed property/element.
 3. **Self-contained text salvage** — a lossy fallback that runs only when
    recovery fails: strips comments, normalizes Python literals, converts
    single-quoted strings, quotes unquoted keys, and completes unclosed
    containers. No external JSON-repair dependency.
 4. **Schema-guided node strategies** — fixes that survive as *valid but
    wrong-shaped* JSON: expanding a field that arrived as a JSON string back
-   into an array or object, and removing optional `null` values that a strict
-   schema rejects.
+   into an array or object, removing optional `null` values that a strict
+   schema rejects, and — when coercions are enabled — array wrapping,
+   string-to-number/boolean conversion, enum fuzzy matching, and
+   unknown-property pruning for strict contracts.
 
 Every result carries a per-strategy audit. Each configured strategy is
 reported exactly once, in order, with its status and an optional note:

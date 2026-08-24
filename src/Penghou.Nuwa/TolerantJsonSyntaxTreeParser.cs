@@ -14,7 +14,8 @@ internal sealed class TolerantJsonSyntaxTreeParser
         string input,
         JsonSchemaExpectation? expectation,
         JsonRepairLimits limits,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowTruncationSalvage = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -32,7 +33,8 @@ internal sealed class TolerantJsonSyntaxTreeParser
                         input,
                         expectation,
                         limits,
-                        cancellationToken)
+                        cancellationToken,
+                        allowTruncationSalvage)
                     .Parse();
 
             if (recovery.Root is not null)

@@ -15,6 +15,10 @@ public sealed class JsonRepairOptionsTests
 
         options.TextRepairs.Should().Equal(
             typeof(MarkdownJsonFenceRepairStrategy),
+            typeof(UnicodeDelimiterNormalizationStrategy),
+            typeof(XmlWrappedExtractionStrategy),
+            typeof(ConcatenatedJsonExtractionStrategy),
+            typeof(ProseWrapperExtractionStrategy),
             typeof(PseudoCSharpVerbatimStringRepairStrategy),
             typeof(PseudoJavaScriptTemplateStringRepairStrategy));
         options.SalvageRepairs.Should().Equal(
@@ -46,6 +50,10 @@ public sealed class JsonRepairOptionsTests
         options.TextRepairs.Should().Equal(
             typeof(MarkdownJsonFenceRepairStrategy),
             typeof(NoopTextRepair),
+            typeof(UnicodeDelimiterNormalizationStrategy),
+            typeof(XmlWrappedExtractionStrategy),
+            typeof(ConcatenatedJsonExtractionStrategy),
+            typeof(ProseWrapperExtractionStrategy),
             typeof(PseudoCSharpVerbatimStringRepairStrategy),
             typeof(PseudoJavaScriptTemplateStringRepairStrategy));
     }

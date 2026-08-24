@@ -367,7 +367,8 @@ public class JsonRepairChatClient : DelegatingChatClient
                     result.ShapeErrors,
                     result.TextRepairs,
                     result.NodeRepairs,
-                    result.TolerantRecovery),
+                    result.TolerantRecovery,
+                    result.Confidence),
                 cancellationToken)
             : ValueTask.CompletedTask;
 

@@ -6,5 +6,6 @@ internal interface ITolerantJsonSyntaxTreeParser
         string input,
         JsonSchemaExpectation? expectation,
         JsonRepairLimits limits,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        bool allowTruncationSalvage = false);
 }

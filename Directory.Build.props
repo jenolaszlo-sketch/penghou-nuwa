@@ -7,7 +7,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
-    <Version>0.5.1</Version>
+    <Version>0.6.0</Version>
     <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
 

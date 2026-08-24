@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Penghou.Nuwa.Strategies;
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -16,6 +18,7 @@ public sealed class JsonRepairPipeline
     private readonly IReadOnlyList<INodeRepair> _nodeRepairs;
     private readonly ILogger<JsonRepairPipeline> _logger;
     private readonly JsonRepairLimits _limits;
+    private readonly bool _allowTruncationSalvage;
     private readonly TolerantJsonSyntaxTreeParser _tolerantParser =
         new();
 
@@ -35,6 +38,27 @@ public sealed class JsonRepairPipeline
         IReadOnlyList<INodeRepair> nodeRepairs,
         ILogger<JsonRepairPipeline> logger,
         JsonRepairLimits limits)
+        : this(
+            textRepairs,
+            salvageRepairs,
+            nodeRepairs,
+            logger,
+            limits,
+            allowTruncationSalvage: true)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a reusable repair pipeline with explicit resource limits
+    /// and truncation behaviour.
+    /// </summary>
+    public JsonRepairPipeline(
+        IReadOnlyList<ITextRepair> textRepairs,
+        IReadOnlyList<ITextRepair> salvageRepairs,
+        IReadOnlyList<INodeRepair> nodeRepairs,
+        ILogger<JsonRepairPipeline> logger,
+        JsonRepairLimits limits,
+        bool allowTruncationSalvage)
     {
         ArgumentNullException.ThrowIfNull(textRepairs);
         ArgumentNullException.ThrowIfNull(salvageRepairs);
@@ -48,6 +72,7 @@ public sealed class JsonRepairPipeline
         _nodeRepairs = nodeRepairs.ToArray();
         _logger = logger;
         _limits = limits;
+        _allowTruncationSalvage = allowTruncationSalvage;
     }
 
     /// <summary>
@@ -71,7 +96,8 @@ public sealed class JsonRepairPipeline
             Instantiate<INodeRepair>(
                 options.NodeRepairs),
             NullLogger<JsonRepairPipeline>.Instance,
-            options.Limits);
+            options.Limits,
+            options.AllowTruncationSalvage);
     }
 
     public async ValueTask<JsonRepairResult> RepairAsync(
@@ -100,6 +126,212 @@ public sealed class JsonRepairPipeline
             stopwatch.ElapsedMilliseconds);
 
         return result;
+    }
+
+    /// <summary>
+    /// Repairs a payload as it streams in. After every chunk the pipeline
+    /// emits a <see cref="JsonRepairStreamDelta"/> covering the newly stable
+    /// prefix of the accumulated input — text that lies outside any open
+    /// string, ends on a complete token boundary, and keeps a holdback margin
+    /// from the tail so pending punctuation repairs cannot invalidate it.
+    /// When the chunk stream finishes, one
+    /// <see cref="JsonRepairStreamCompleted"/> event carries the authoritative
+    /// <see cref="JsonRepairResult"/> for the full payload. Deltas are a
+    /// best-effort live preview; only the completed event is contractual.
+    /// </summary>
+    public async IAsyncEnumerable<JsonRepairStreamEvent> RepairStreamAsync(
+        IAsyncEnumerable<string> chunks,
+        JsonSchemaExpectation? expectation = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(chunks);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var buffer = new StringBuilder();
+        var emittedOffset = 0;
+
+        await foreach (var chunk in chunks.WithCancellation(cancellationToken)
+                           .ConfigureAwait(false))
+        {
+            if (chunk.Length == 0)
+            {
+                continue;
+            }
+
+            buffer.Append(chunk);
+
+            if (buffer.Length > _limits.MaxInputLength)
+            {
+                throw new JsonRepairLimitException(
+                    $"Streamed input length {buffer.Length} exceeds the configured maximum of {_limits.MaxInputLength} characters.");
+            }
+
+            var stableLength =
+                StablePrefixScanner.FindStableLength(
+                    buffer.ToString(),
+                    emittedOffset);
+
+            if (stableLength > emittedOffset)
+            {
+                yield return new JsonRepairStreamDelta(
+                    emittedOffset,
+                    buffer.ToString(
+                        emittedOffset,
+                        stableLength - emittedOffset));
+                emittedOffset = stableLength;
+            }
+        }
+
+        var accumulated = buffer.ToString();
+        if (accumulated.Trim().Length == 0)
+        {
+            throw new ArgumentException(
+                "The chunk stream contained no content.",
+                nameof(chunks));
+        }
+
+        yield return new JsonRepairStreamCompleted(
+            await RepairAsync(
+                    accumulated,
+                    expectation,
+                    cancellationToken)
+                .ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Conservative stability rules for streamed previews:
+    /// <list type="bullet">
+    /// <item>No emission inside strings or before the first structural token.</item>
+    /// <item>Emission points are token boundaries outside string literals.</item>
+    /// <item>A holdback margin is kept from the tail so repairs that edit
+    /// trailing punctuation (e.g. removing a trailing comma) cannot invalidate
+    /// already-emitted deltas.</item>
+    /// </list>
+    /// </summary>
+    internal static class StablePrefixScanner
+    {
+        /// <summary>Characters withheld from emission until more text arrives.</summary>
+        internal const int TailHoldback = 16;
+
+        public static int FindStableLength(
+            string buffer,
+            int emittedOffset)
+        {
+            var limit = buffer.Length - TailHoldback;
+            if (limit <= emittedOffset)
+            {
+                return emittedOffset;
+            }
+
+            var depth = 0;
+            var sawStructure = false;
+            var boundary = -1;
+
+            var index = 0;
+            while (index < limit)
+            {
+                var current = buffer[index];
+
+                switch (current)
+                {
+                    case '"':
+                        {
+                            // Skip a complete string literal.
+                            index++;
+                            while (index < limit)
+                            {
+                                if (buffer[index] == '\\')
+                                {
+                                    index += 2;
+                                    continue;
+                                }
+
+                                if (buffer[index] == '"')
+                                {
+                                    break;
+                                }
+
+                                index++;
+                            }
+
+                            if (index >= limit)
+                            {
+                                // Unterminated within the safe region.
+                                return boundary < emittedOffset
+                                    ? emittedOffset
+                                    : Math.Max(boundary + 1, emittedOffset);
+                            }
+
+                            if (depth > 0)
+                            {
+                                boundary = index;
+                                sawStructure = true;
+                            }
+
+                            index++;
+                            break;
+                        }
+                    case '{' or '[':
+                        depth++;
+                        sawStructure = true;
+                        boundary = index;
+                        index++;
+                        break;
+                    case '}' or ']':
+                        depth--;
+                        boundary = index;
+                        index++;
+                        break;
+                    case ':' or ',':
+                        boundary = index;
+                        index++;
+                        break;
+                    default:
+                        if (char.IsWhiteSpace(current))
+                        {
+                            if (boundary >= 0)
+                            {
+                                boundary = index - 1 < boundary
+                                    ? boundary
+                                    : index - 1;
+                            }
+
+                            index++;
+                            break;
+                        }
+
+                        // Numbers and literals: emit through their end.
+                        if (boundary >= 0 && depth > 0)
+                        {
+                            var tokenEnd = index;
+                            while (tokenEnd < limit &&
+                                   !char.IsWhiteSpace(buffer[tokenEnd]) &&
+                                   buffer[tokenEnd] is not (',' or '}' or ']' or '"' or ':'))
+                            {
+                                tokenEnd++;
+                            }
+
+                            boundary = tokenEnd - 1;
+                            index = tokenEnd;
+                            break;
+                        }
+
+                        index++;
+                        break;
+                }
+            }
+
+            if (!sawStructure ||
+                boundary < emittedOffset)
+            {
+                return emittedOffset;
+            }
+
+            // Never emit past an unbalanced close.
+            return depth < 0
+                ? emittedOffset
+                : Math.Min(boundary + 1, limit);
+        }
     }
 
     private async ValueTask<JsonRepairResult> RepairCoreAsync(
@@ -199,7 +431,8 @@ public sealed class JsonRepairPipeline
                 current,
                 expectation,
                 _limits,
-                cancellationToken);
+                cancellationToken,
+                _allowTruncationSalvage);
 
         if (tolerantParse.Root is null)
         {
@@ -243,7 +476,8 @@ public sealed class JsonRepairPipeline
                         current,
                         expectation,
                         _limits,
-                        cancellationToken);
+                        cancellationToken,
+                        _allowTruncationSalvage);
 
                 if (tolerantParse.Root is not null)
                 {

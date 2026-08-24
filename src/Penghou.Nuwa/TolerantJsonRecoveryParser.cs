@@ -27,19 +27,22 @@ internal sealed class TolerantJsonRecoveryParser
     private readonly CancellationToken cancellationToken;
     private readonly int maxDepth;
     private readonly CorrectionBudget correctionBudget;
+    private readonly bool allowTruncationSalvage;
 
     internal TolerantJsonRecoveryParser(
         string input,
         JsonSchemaExpectation? expectation,
         JsonRepairLimits limits,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowTruncationSalvage = false)
         : this(
             input,
             expectation,
             limits,
             Math.Min(limits.MaxDepth, HardMaxDepth),
             new CorrectionBudget(Math.Min(limits.MaxCorrections, HardMaxCorrections)),
-            cancellationToken)
+            cancellationToken,
+            allowTruncationSalvage)
     {
     }
 
@@ -49,7 +52,8 @@ internal sealed class TolerantJsonRecoveryParser
         JsonRepairLimits limits,
         int depthAllowance,
         CorrectionBudget correctionBudget,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowTruncationSalvage = false)
     {
         _reader = new TolerantJsonTokenReader(input);
         this.expectation = expectation;
@@ -57,9 +61,19 @@ internal sealed class TolerantJsonRecoveryParser
         this.cancellationToken = cancellationToken;
         maxDepth = Math.Min(depthAllowance, HardMaxDepth);
         this.correctionBudget = correctionBudget;
+        this.allowTruncationSalvage = allowTruncationSalvage;
     }
 
     private const int HardMaxCorrections = 100_000;
+
+    /// <summary>
+    /// Whether the input ended before the current construct did — the
+    /// signature of a truncated generation.
+    /// </summary>
+    private bool IsAtInputEnd() =>
+        _reader.IsAtEnd ||
+        _reader.Peek().Kind ==
+        JsonTokenKind.End;
 
     private sealed class CorrectionBudget(int remaining)
     {
@@ -314,8 +328,24 @@ internal sealed class TolerantJsonRecoveryParser
                 ParseValue(
                     propertyExpectation);
 
-            if (!propertyValue.Succeeded ||
-                result.ContainsKey(
+            if (!propertyValue.Succeeded)
+            {
+                if (allowTruncationSalvage &&
+                    IsAtInputEnd())
+                {
+                    // Truncated generation: keep every complete property and
+                    // drop the one whose value never arrived.
+                    Record(
+                        token.Start,
+                        $"dropped incomplete property '{propertyName}' (input truncated)");
+                    return NodeResult.Success(
+                        result);
+                }
+
+                return NodeResult.Failed;
+            }
+
+            if (result.ContainsKey(
                     propertyName))
             {
                 return NodeResult.Failed;
@@ -449,7 +479,20 @@ internal sealed class TolerantJsonRecoveryParser
                 itemExpectation);
 
             if (!item.Succeeded)
+            {
+                if (allowTruncationSalvage &&
+                    IsAtInputEnd())
+                {
+                    // Truncated generation: keep the elements that completed.
+                    Record(
+                        token.Start,
+                        "dropped incomplete array element (input truncated)");
+                    return NodeResult.Success(
+                        result);
+                }
+
                 return NodeResult.Failed;
+            }
 
             result.Add(item.Node);
             token = _reader.Peek();

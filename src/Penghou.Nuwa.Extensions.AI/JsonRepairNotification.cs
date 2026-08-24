@@ -9,4 +9,5 @@ public sealed record JsonRepairNotification(
     IReadOnlyList<string> ShapeErrors,
     IReadOnlyList<StrategyReport> TextRepairs,
     IReadOnlyList<StrategyReport> NodeRepairs,
-    TolerantRecoveryReport? TolerantRecovery);
+    TolerantRecoveryReport? TolerantRecovery,
+    double Confidence = 1);

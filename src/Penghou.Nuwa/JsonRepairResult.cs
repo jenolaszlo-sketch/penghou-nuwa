@@ -112,7 +112,92 @@ public sealed class JsonRepairResult
             textRepairs.LastOrDefault(
                 report =>
                     report.Status == StrategyStatus.Succeeded);
+        Confidence = ComputeConfidence(
+            succeeded: Document is not null,
+            wasRepaired,
+            textRepairs,
+            nodeRepairs,
+            tolerantParse,
+            shapeStatus);
     }
+
+    /// <summary>
+    /// A heuristic 0–1 confidence score for the repaired payload. Unmodified
+    /// valid JSON scores 1.0; every recorded mutation reduces the score, and
+    /// lossy salvage or a shape mismatch reduce it sharply. Deterministic for
+    /// a given input: the value is derived only from repair diagnostics.
+    /// </summary>
+    public double Confidence { get; }
+
+    private static double ComputeConfidence(
+        bool succeeded,
+        bool wasRepaired,
+        IReadOnlyList<StrategyReport> textRepairs,
+        IReadOnlyList<StrategyReport> nodeRepairs,
+        TolerantJsonSyntaxTreeParseResult? tolerantParse,
+        JsonRepairShapeStatus shapeStatus)
+    {
+        if (!succeeded)
+        {
+            return 0;
+        }
+
+        if (!wasRepaired)
+        {
+            return 1;
+        }
+
+        var score = 1.0;
+
+        // Transport-level rewrites (fences, wrappers) are cheap signals.
+        score -= 0.05 *
+            textRepairs.Count(
+                report =>
+                    report.Status ==
+                    StrategyStatus.Succeeded);
+
+        // Tolerant punctuation corrections are routine.
+        score -= Math.Min(
+            0.30,
+            0.02 * (tolerantParse?.CorrectionCount ?? 0));
+        score -= Math.Min(
+            0.15,
+            0.03 * (tolerantParse?.SchemaGuidedStringCorrectionCount ?? 0));
+
+        // Node-level mutations alter values or structure more substantively.
+        score -= 0.08 *
+            nodeRepairs.Count(
+                report =>
+                    report.Status ==
+                    StrategyStatus.Succeeded);
+
+        // Lossy salvage discards information by design.
+        if (textRepairs.Any(
+                report =>
+                    report.Status ==
+                    StrategyStatus.Succeeded &&
+                    report.Name ==
+                    "salvage"))
+        {
+            score *= 0.6;
+        }
+
+        if (shapeStatus ==
+            JsonRepairShapeStatus.Mismatched)
+        {
+            score *= 0.5;
+        }
+
+        return Math.Clamp(score, 0, 1);
+    }
+
+    /// <summary>
+    /// Whether <see cref="Confidence"/> meets the supplied threshold
+    /// (mirrors the confidence-gating pattern used by constrained local
+    /// extractors).
+    /// </summary>
+    public bool IsConfident(double minimumConfidence) =>
+        Confidence >= minimumConfidence;
 
     /// <summary>
     /// Creates a successful result from the repaired root and its text.
