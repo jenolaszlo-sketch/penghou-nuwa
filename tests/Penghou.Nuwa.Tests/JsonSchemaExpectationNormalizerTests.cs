@@ -311,6 +311,35 @@ public sealed class JsonSchemaExpectationNormalizerTests
     }
 
     [Fact]
+    public void FactoryExpectation_OwnsNormalizedSchemaSnapshot()
+    {
+        var source = JsonNode.Parse(
+            """{"type":"object","properties":{"name":{"type":"string"}}}""")!;
+        var expectation = JsonSchemaExpectation.FromSchemaNode(source);
+
+        source["properties"]!["added"] =
+            JsonNode.Parse("""{"type":"number"}""");
+
+        expectation.GetProperty("added").Should().BeNull();
+    }
+
+    [Fact]
+    public void DirectConstructor_ObservesLiveSchemaMutations()
+    {
+        var schema = JsonNode.Parse(
+            """{"type":"object","properties":{}}""")!;
+        var expectation = new JsonSchemaExpectation(
+            new Dictionary<string, JsonSchemaFieldKind>(),
+            schema);
+
+        schema["properties"]!["added"] =
+            JsonNode.Parse("""{"type":"number"}""");
+
+        expectation.GetProperty("added")!
+            .ExpectedKind.Should().Be(JsonSchemaFieldKind.Number);
+    }
+
+    [Fact]
     public void FromSchemaNode_UnionRootKeepsCanonicalShape()
     {
         var expectation = JsonSchemaExpectation.FromSchemaNode(

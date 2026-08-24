@@ -46,35 +46,43 @@ public sealed class PseudoJavaScriptTemplateStringRepairStrategy
         if (string.IsNullOrWhiteSpace(input))
             return false;
 
-        var current = input;
         var searchStart = 0;
-        var changed = false;
+        var copyStart = 0;
+        StringBuilder? output = null;
 
         while (TryFindTemplateLiteral(
-                   current,
+                   input,
                    searchStart,
                    out var openingBacktick,
                    out var closingBacktick))
         {
-            var rawValue = current[
+            var rawValue = input[
                 (openingBacktick + 1)..closingBacktick];
             var value =
                 DecodeEscapedBackticks(rawValue);
             var jsonString =
                 JsonSerializer.Serialize(value);
 
-            current =
-                current[..openingBacktick] +
-                jsonString +
-                current[(closingBacktick + 1)..];
-            searchStart =
-                openingBacktick +
-                jsonString.Length;
-            changed = true;
+            output ??= new StringBuilder(input.Length);
+            output.Append(
+                input,
+                copyStart,
+                openingBacktick - copyStart);
+            output.Append(jsonString);
+
+            copyStart = closingBacktick + 1;
+            searchStart = copyStart;
         }
 
-        repaired = current;
-        return changed;
+        if (output is null)
+            return false;
+
+        output.Append(
+            input,
+            copyStart,
+            input.Length - copyStart);
+        repaired = output.ToString();
+        return true;
     }
 
     private static bool TryFindTemplateLiteral(

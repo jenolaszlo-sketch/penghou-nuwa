@@ -25,12 +25,91 @@ public sealed class SchemaGuidedEnumFuzzyMatchStrategy
         ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(expectation);
 
+        if (!CanRepair(node, expectation))
+        {
+            return new(new NodeRepairAttempt(
+                RepairOutcome.NotApplicable,
+                null));
+        }
+
         var repaired = node.DeepClone();
         var changed = RepairNode(repaired, expectation);
 
         return new(new NodeRepairAttempt(
             changed ? RepairOutcome.Repaired : RepairOutcome.NotApplicable,
             changed ? repaired : null));
+    }
+
+    private static bool CanRepair(
+        JsonNode node,
+        JsonSchemaExpectation expectation)
+    {
+        var effective =
+            expectation.TryResolveBranch(node) ??
+            expectation;
+
+        if (node is JsonObject jsonObject)
+        {
+            foreach (var property in jsonObject)
+            {
+                if (property.Value is null)
+                    continue;
+
+                var propertyExpectation =
+                    effective.GetProperty(property.Key);
+                if (propertyExpectation is null)
+                    continue;
+
+                if (property.Value is JsonValue value &&
+                    value.TryGetValue<string>(out var text) &&
+                    TryMatchEnum(
+                        propertyExpectation.Schema,
+                        text,
+                        out var matched) &&
+                    !string.Equals(
+                        text,
+                        matched,
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                if (CanRepair(
+                        property.Value,
+                        propertyExpectation))
+                {
+                    return true;
+                }
+            }
+        }
+        else if (node is JsonArray jsonArray &&
+                 effective.GetItem() is { } itemExpectation)
+        {
+            foreach (var item in jsonArray)
+            {
+                if (item is null)
+                    continue;
+
+                if (item is JsonValue value &&
+                    value.TryGetValue<string>(out var text) &&
+                    TryMatchEnum(
+                        itemExpectation.Schema,
+                        text,
+                        out var matched) &&
+                    !string.Equals(
+                        text,
+                        matched,
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                if (CanRepair(item, itemExpectation))
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool RepairNode(

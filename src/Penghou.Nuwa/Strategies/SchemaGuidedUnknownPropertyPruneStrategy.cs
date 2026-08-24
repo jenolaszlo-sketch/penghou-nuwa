@@ -23,12 +23,64 @@ public sealed class SchemaGuidedUnknownPropertyPruneStrategy
         ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(expectation);
 
+        if (!CanRepair(node, expectation))
+        {
+            return new(new NodeRepairAttempt(
+                RepairOutcome.NotApplicable,
+                null));
+        }
+
         var repaired = node.DeepClone();
         var changed = RepairNode(repaired, expectation);
 
         return new(new NodeRepairAttempt(
             changed ? RepairOutcome.Repaired : RepairOutcome.NotApplicable,
             changed ? repaired : null));
+    }
+
+    private static bool CanRepair(
+        JsonNode node,
+        JsonSchemaExpectation expectation)
+    {
+        var effective =
+            expectation.TryResolveBranch(node) ??
+            expectation;
+
+        if (node is JsonObject jsonObject)
+        {
+            if (ForbidsAdditionalProperties(effective.Schema) &&
+                jsonObject.Any(property =>
+                    !effective.DefinesProperty(property.Key)))
+            {
+                return true;
+            }
+
+            foreach (var property in jsonObject)
+            {
+                var propertyExpectation =
+                    effective.GetProperty(property.Key);
+                if (property.Value is not null &&
+                    propertyExpectation is not null &&
+                    CanRepair(property.Value, propertyExpectation))
+                {
+                    return true;
+                }
+            }
+        }
+        else if (node is JsonArray jsonArray &&
+                 effective.GetItem() is { } itemExpectation)
+        {
+            foreach (var item in jsonArray)
+            {
+                if (item is not null &&
+                    CanRepair(item, itemExpectation))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static bool RepairNode(

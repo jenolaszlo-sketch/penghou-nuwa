@@ -92,6 +92,8 @@ Completed in the first architecture slice:
 - Failure output is subject to the same output limit as successful repair.
 - AI response/tool schemas are cached per wrapped client by schema identity.
 - Optional-null removal performs a dry applicability scan before cloning.
+- Enum fuzzy matching and strict unknown-property pruning perform dry
+  applicability scans before cloning unchanged payload trees.
 - Ordered strategy registration supports types, instances, and factories in
   standalone and dependency-injection construction; reflection remains a
   compatibility fallback.
@@ -103,17 +105,26 @@ Completed in the first architecture slice:
 
 ### Schema expectation reuse
 
-- Define cache ownership and mutation semantics first because `Schema` is
-  currently publicly reachable as a mutable `JsonNode`.
+- Factory-created expectations own a normalized schema snapshot and cache its
+  child expectations. Direct-constructor expectations deliberately retain
+  live, uncached schema semantics for compatibility; both behaviors are
+  documented and covered by tests.
 
 ### Parsing and allocation performance
 
-- Replace repeated string reconstruction in template/verbatim strategies with
-  bounded single-pass builders where benchmarks show value.
-- Reuse parse results inside salvage strategies.
-- Extend dry applicability scans to other node strategies where the extra
-  traversal is cheaper than routinely cloning unchanged payloads.
+- JavaScript template repair uses a single bounded builder rather than
+  reconstructing the complete string after every literal, with a large-input
+  regression test.
+- Extend dry applicability scans to remaining node strategies only where
+  profiling shows the extra traversal is cheaper than cloning; conversion and
+  array-wrap scans can allocate or parse during detection and are not assumed
+  to be wins.
 - Add adversarial benchmarks before and after each hot-path optimization.
+
+Salvage parse-result reuse remains intentionally deferred: `ITextRepair`
+returns text and the pipeline owns parsing. Carrying a parsed artifact would
+change the public strategy contract and should be justified by profiling
+rather than introduced as a special-case side channel.
 
 ### Unified limits and causality
 

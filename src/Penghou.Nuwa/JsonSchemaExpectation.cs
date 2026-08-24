@@ -9,6 +9,13 @@ namespace Penghou.Nuwa;
 /// implementation, just enough to know "this property should be an array/object".
 /// Derived once from a tool's generated JSON Schema and reused across repair attempts.
 /// </summary>
+/// <remarks>
+/// Factory methods normalize and own a snapshot of the supplied schema, and
+/// memoize expectations for its children. Mutating the original schema after
+/// construction therefore has no effect. The public primary constructor keeps
+/// its historical live-schema semantics: when callers supply <see cref="Schema"/>
+/// directly, child lookups are uncached and observe later mutations.
+/// </remarks>
 public sealed record JsonSchemaExpectation(
     IReadOnlyDictionary<string, JsonSchemaFieldKind> PropertyKinds,
     JsonNode? Schema = null,

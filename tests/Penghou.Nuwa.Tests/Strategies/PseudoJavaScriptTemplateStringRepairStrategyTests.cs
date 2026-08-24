@@ -118,6 +118,25 @@ public sealed class
         repaired.Should().EndWith("}]");
     }
 
+    [Fact]
+    public void RepairAsync_ManyTemplateValues_PreservesOrderAndContent()
+    {
+        var input = "{" + string.Join(
+            ',',
+            Enumerable.Range(0, 1_000)
+                .Select(index => $"\"key{index}\":`value {index}`")) + "}";
+
+        var attempt = Repair(_strategy, input);
+
+        attempt.Outcome.Should().Be(RepairOutcome.Repaired);
+        using var document = JsonDocument.Parse(attempt.Repaired!);
+        document.RootElement.EnumerateObject().Should().HaveCount(1_000);
+        document.RootElement.GetProperty("key0").GetString()
+            .Should().Be("value 0");
+        document.RootElement.GetProperty("key999").GetString()
+            .Should().Be("value 999");
+    }
+
     private static TextRepairAttempt Repair(
         ITextRepair strategy,
         string input) =>
