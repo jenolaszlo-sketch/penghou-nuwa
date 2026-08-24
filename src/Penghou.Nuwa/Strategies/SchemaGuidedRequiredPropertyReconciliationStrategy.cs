@@ -24,72 +24,18 @@ public sealed class SchemaGuidedRequiredPropertyReconciliationStrategy
 
         var repaired = node.DeepClone();
         var actions = new List<string>();
-        var changed = RepairNode(
+        var changed = SchemaReconciliationTraversal.Repair(
             repaired,
             expectation,
             "$",
-            actions,
+            (value, effective, path) =>
+                ReconcileObject(value, effective, path, actions),
             cancellationToken);
 
         return new(new NodeRepairAttempt(
             changed ? RepairOutcome.Repaired : RepairOutcome.NotApplicable,
             changed ? repaired : null,
-            changed ? string.Join("; ", actions) : null));
-    }
-
-    private static bool RepairNode(
-        JsonNode node,
-        JsonSchemaExpectation expectation,
-        string path,
-        ICollection<string> actions,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var effective = expectation.TryResolveBranch(node);
-        if (effective is null)
-            return false;
-
-        var changed = false;
-        if (node is JsonObject jsonObject)
-        {
-            changed |= ReconcileObject(
-                jsonObject,
-                effective,
-                path,
-                actions);
-
-            foreach (var property in jsonObject.ToArray())
-            {
-                if (property.Value is null ||
-                    effective.GetProperty(property.Key) is not { } childExpectation)
-                    continue;
-
-                changed |= RepairNode(
-                    property.Value,
-                    childExpectation,
-                    AppendProperty(path, property.Key),
-                    actions,
-                    cancellationToken);
-            }
-        }
-        else if (node is JsonArray array &&
-                 effective.GetItem() is { } itemExpectation)
-        {
-            for (var index = 0; index < array.Count; index++)
-            {
-                if (array[index] is { } item)
-                {
-                    changed |= RepairNode(
-                        item,
-                        itemExpectation,
-                        $"{path}[{index}]",
-                        actions,
-                        cancellationToken);
-                }
-            }
-        }
-
-        return changed;
+            changed ? SchemaRepairDiagnostics.Join(actions) : null));
     }
 
     private static bool ReconcileObject(

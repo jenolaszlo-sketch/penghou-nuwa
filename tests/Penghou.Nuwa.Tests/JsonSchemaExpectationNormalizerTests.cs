@@ -321,6 +321,59 @@ public sealed class JsonSchemaExpectationNormalizerTests
     }
 
     [Fact]
+    public void TryResolveBranch_RefusesMultipleStructurallyFittingBranches()
+    {
+        var expectation = JsonSchemaExpectation.FromSchemaJson(
+            """{"oneOf":[{"type":"object","properties":{"id":{"type":"string"}}},{"type":"object","properties":{"id":{"type":"string"},"note":{"type":"string"}}}]}""")!;
+
+        expectation.TryResolveBranch(
+                JsonNode.Parse("""{"id":"A1"}""")!)
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void TryResolveBranch_RefusesDuplicateDiscriminatorMatches()
+    {
+        var expectation = JsonSchemaExpectation.FromSchemaJson(
+            """{"oneOf":[{"type":"object","properties":{"name":{"const":"run","type":"string"}}},{"type":"object","properties":{"name":{"const":"run","type":"string"},"note":{"type":"string"}}}]}""")!;
+
+        expectation.TryResolveBranch(
+                JsonNode.Parse("""{"name":"run"}""")!)
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void ValidateShape_RejectsValueOutsideEnum()
+    {
+        var expectation = JsonSchemaExpectation.FromSchemaJson(
+            """{"type":"string","enum":["active","inactive"]}""")!;
+
+        expectation.ValidateShape(JsonValue.Create("unknown")!)
+            .Should().ContainSingle("*allowed enum value*");
+    }
+
+    [Fact]
+    public void ValidateShape_RejectsValueDifferentFromConst()
+    {
+        var expectation = JsonSchemaExpectation.FromSchemaJson(
+            """{"type":"string","const":"run"}""")!;
+
+        expectation.ValidateShape(JsonValue.Create("stop")!)
+            .Should().ContainSingle("*required const value*");
+    }
+
+    [Fact]
+    public void ValidateShape_RejectsPropertiesWhenStrictSchemaDeclaresNone()
+    {
+        var expectation = JsonSchemaExpectation.FromSchemaJson(
+            """{"type":"object","additionalProperties":false}""")!;
+
+        expectation.ValidateShape(
+                JsonNode.Parse("""{"unexpected":true}""")!)
+            .Should().ContainSingle("*not declared by the schema*");
+    }
+
+    [Fact]
     public void Accepts_RejectsUndeclaredProperties()
     {
         var expectation = JsonSchemaExpectation.FromSchemaNode(

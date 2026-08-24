@@ -535,6 +535,7 @@ public sealed class JsonRepairPipeline
         var nodeReports = new List<StrategyReport>();
         var current = root;
         var nodeWasRepaired = false;
+        var correctionCount = tolerantParse?.CorrectionCount ?? 0;
         if (expectation is not null)
         {
             foreach (var strategy in _nodeRepairs)
@@ -576,6 +577,16 @@ public sealed class JsonRepairPipeline
                     continue;
                 }
 
+                correctionCount += CountNodeCorrections(
+                    current,
+                    attempt.Repaired!,
+                    _limits.MaxCorrections - correctionCount);
+                if (correctionCount > _limits.MaxCorrections)
+                {
+                    throw new JsonRepairLimitException(
+                        $"Repair exceeded the maximum of {_limits.MaxCorrections} corrections.");
+                }
+
                 current = attempt.Repaired!;
                 nodeWasRepaired = true;
             }
@@ -611,6 +622,64 @@ public sealed class JsonRepairPipeline
             tolerantParse,
             shapeStatus,
             shapeErrors);
+    }
+
+    private static int CountNodeCorrections(
+        JsonNode? before,
+        JsonNode? after,
+        int remaining)
+    {
+        if (JsonNode.DeepEquals(before, after))
+            return 0;
+        if (remaining < 0)
+            return 1;
+
+        if (before is JsonObject beforeObject &&
+            after is JsonObject afterObject)
+        {
+            var count = 0;
+            foreach (var name in beforeObject.Select(property => property.Key)
+                         .Union(afterObject.Select(property => property.Key), StringComparer.Ordinal))
+            {
+                if (!beforeObject.TryGetPropertyValue(name, out var beforeValue) ||
+                    !afterObject.TryGetPropertyValue(name, out var afterValue))
+                {
+                    count++;
+                }
+                else
+                {
+                    count += CountNodeCorrections(
+                        beforeValue,
+                        afterValue,
+                        remaining - count);
+                }
+
+                if (count > remaining)
+                    return count;
+            }
+
+            return count;
+        }
+
+        if (before is JsonArray beforeArray &&
+            after is JsonArray afterArray)
+        {
+            var count = Math.Abs(beforeArray.Count - afterArray.Count);
+            var sharedLength = Math.Min(beforeArray.Count, afterArray.Count);
+            for (var index = 0; index < sharedLength; index++)
+            {
+                count += CountNodeCorrections(
+                    beforeArray[index],
+                    afterArray[index],
+                    remaining - count);
+                if (count > remaining)
+                    return count;
+            }
+
+            return count;
+        }
+
+        return 1;
     }
 
     private void LogOutcome(

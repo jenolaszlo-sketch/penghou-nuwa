@@ -171,6 +171,15 @@ public sealed class JsonRepairResult
                     report.Status ==
                     StrategyStatus.Succeeded);
 
+        // Structural property inference is deliberately broader than a
+        // strong name match or an explicit type coercion.
+        score -= 0.07 *
+            nodeRepairs.Count(
+                report =>
+                    report.Status == StrategyStatus.Succeeded &&
+                    report.Name ==
+                    "schema-guided-structural-property-reconciliation");
+
         // Lossy salvage discards information by design.
         if (textRepairs.Any(
                 report =>

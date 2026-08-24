@@ -327,16 +327,6 @@ public sealed record JsonSchemaExpectation(
             if (matches.Count == 1)
                 return matches[0].Expectation;
 
-            if (matches.Count > 1)
-            {
-                return matches
-                    .OrderBy(branch =>
-                        DeclaredPropertyCount(
-                            branch.Expectation))
-                    .First()
-                    .Expectation;
-            }
-
             return null;
         }
 
@@ -345,14 +335,11 @@ public sealed record JsonSchemaExpectation(
                 NodeFitsBranch(
                     obj,
                     branch.Expectation))
-            .OrderBy(branch =>
-                DeclaredPropertyCount(
-                    branch.Expectation))
             .ToList();
 
-        return candidates
-            .FirstOrDefault()
-            ?.Expectation;
+        return candidates.Count == 1
+            ? candidates[0].Expectation
+            : null;
     }
 
     /// <summary>
@@ -486,13 +473,6 @@ public sealed record JsonSchemaExpectation(
         return true;
     }
 
-    private static int DeclaredPropertyCount(
-        JsonSchemaExpectation branch) =>
-        branch.Schema is JsonObject schemaObject &&
-        schemaObject["properties"] is JsonObject properties
-            ? properties.Count
-            : 0;
-
     public IReadOnlySet<string> GetStringPropertyNames()
     {
         var names = new HashSet<string>(
@@ -559,6 +539,20 @@ public sealed record JsonSchemaExpectation(
             return;
         }
 
+        if (schemaObject["enum"] is JsonArray enumMembers &&
+            !enumMembers.Any(member => JsonNode.DeepEquals(member, value)))
+        {
+            errors.Add($"{path} did not match an allowed enum value.");
+            return;
+        }
+
+        if (schemaObject["const"] is { } constant &&
+            !JsonNode.DeepEquals(constant, value))
+        {
+            errors.Add($"{path} did not match the required const value.");
+            return;
+        }
+
         if (value is JsonObject valueObject)
         {
             ValidateRequiredProperties(valueObject, schemaObject, path, errors);
@@ -577,15 +571,18 @@ public sealed record JsonSchemaExpectation(
                     }
                 }
 
-                if (schemaObject["additionalProperties"] is JsonValue additional &&
-                    additional.TryGetValue<bool>(out var allowed) &&
-                    !allowed)
+            }
+
+
+            if (schemaObject["additionalProperties"] is JsonValue additional &&
+                additional.TryGetValue<bool>(out var allowed) &&
+                !allowed)
+            {
+                var declared = schemaObject["properties"] as JsonObject;
+                foreach (var propertyName in valueObject.Select(property => property.Key))
                 {
-                    foreach (var propertyName in valueObject.Select(property => property.Key))
-                    {
-                        if (!properties.ContainsKey(propertyName))
-                            errors.Add($"{path}.{propertyName} is not declared by the schema.");
-                    }
+                    if (declared?.ContainsKey(propertyName) != true)
+                        errors.Add($"{path}.{propertyName} is not declared by the schema.");
                 }
             }
         }

@@ -304,6 +304,26 @@ public sealed class JsonRepairPipelineTests
     }
 
     [Fact]
+    public void RepairAsync_AppliesCorrectionBudgetToNodeRepairs()
+    {
+        var pipeline = JsonRepairPipeline.Create(options =>
+        {
+            options.Limits = options.Limits with { MaxCorrections = 1 };
+            options.EnableSchemaCoercions();
+        });
+        var expectation = JsonSchemaExpectation.FromSchemaJson(
+            """{"type":"object","properties":{},"additionalProperties":false}""")!;
+
+        var act = () => Repair(
+            pipeline,
+            """{"first":1,"second":2}""",
+            expectation);
+
+        act.Should().Throw<JsonRepairLimitException>()
+            .WithMessage("*maximum of 1 corrections*");
+    }
+
+    [Fact]
     public void RepairAsync_ReportsShapeMismatchSeparatelyFromSyntaxSuccess()
     {
         var expectation = JsonSchemaExpectation.FromSchemaJson(

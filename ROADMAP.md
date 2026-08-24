@@ -1,75 +1,172 @@
 # Penghou.Nuwa Roadmap
 
-## Schema-guided reconciliation and coercion hardening
+## Direction
 
-Extend deterministic schema repair without introducing model-based inference.
-Nuwa should repair only when the supplied schema provides a unique,
-explainable interpretation; ambiguous input remains unchanged and is reported
-as a shape mismatch.
+Nuwa is a deterministic JSON repair library for model-produced structured
+output. It should preserve received information, make only explainable
+repairs, expose honest diagnostics, and remain safe on malformed or hostile
+input. Model-based inference and open-ended semantic guessing remain outside
+its scope.
 
-Implementation status:
+## Shipped foundation
 
-- Phase 1 — strong-name required-property reconciliation: implemented.
-- Phase 2 — coercion correctness and item-aware array wrapping: implemented.
-- Phase 3 — separately opt-in structural inference and richer evidence:
-  implemented.
+### Robust recovery
 
-### Required-property name reconciliation
+- Shared work and correction budgets for tolerant and nested recovery.
+- Defensive depth and lookahead limits.
+- Consistent single-quote escape handling.
+- Privacy-safe strategy reports and cancellation throughout recovery loops.
+- Guarded AI middleware that does not rewrite ordinary scalar prose as JSON.
 
-- Consider only unknown source properties and missing required schema
-  properties.
-- Never overwrite an existing target or map multiple sources to one target.
-- Accept casing, separator, missing/duplicated-character, and transposition
-  mistakes only when there is one clearly superior name candidate.
-- Require the source value to match the target schema or have a certified,
-  lossless coercion available.
-- Apply reconciliation before coercion and before destructive unknown-property
-  pruning.
-- Refuse unresolved `oneOf`/`anyOf` branch ambiguity.
-- Keep weak-name structural inference separately opt-in. Permit it only when a
-  distinctive nested object, array-item shape, or enum membership identifies
-  exactly one missing required target; primitive type compatibility alone is
-  insufficient.
+### Schema-guided reconciliation and coercion
 
-### Safe coercion rules
+- Strong-name reconciliation from unknown properties to uniquely matching
+  missing required properties.
+- Separately opt-in structural reconciliation using distinctive object shape,
+  array-item shape, enum membership, or const evidence.
+- Ambiguous candidates and unresolved `oneOf`/`anyOf` branches are refused.
+- Reconciliation never overwrites an existing property or maps competing
+  sources to one target.
+- Integer-aware, finite, lossless string-to-number conversion.
+- Deterministic string-to-boolean and unique enum reconciliation.
+- Scalar-to-array wrapping only after complete item-schema validation, with
+  safe coercion and wrapping applied atomically.
+- `enum`, `const`, required properties, nested types, array items, and strict
+  `additionalProperties:false` objects included in supported shape validation.
+- One correction budget covers tolerant parsing and node-tree mutations.
+- Canonical strategy order: strong-name reconciliation, structural
+  reconciliation, coercion, then destructive unknown-property pruning.
+- Bounded diagnostic evidence and a larger confidence penalty for broader
+  structural inference.
 
-- Distinguish `integer` from `number`; never truncate a fractional value,
-  accept overflow, or create a non-finite number.
-- Convert strings to numbers or booleans only under an explicit target schema
-  and only when conversion is lossless and unambiguous.
-- Reconcile enum values only when the closest permitted value is unique.
-- Preserve required values and the existing optional-null semantics.
-- Never collapse arrays into scalars.
+## Next milestone — usability and operational polish
 
-### Scalar-to-array wrapping
+These changes are intended to be small, compatible, and independently
+reviewable.
 
-Wrap a scalar only when it is compatible with the array's `items` schema:
+### Dependency injection
 
-```text
-scalar already matches item schema
-    -> wrap as the single item
+- Make `AddJsonRepair()` self-sufficient when the host has not called
+  `AddLogging()`, using a null logger fallback.
+- Add integration coverage for registration with and without logging.
 
-scalar has an enabled, deterministic, lossless coercion to the item schema
-    -> coerce and wrap atomically
+### Fluent configuration
 
-scalar is incompatible or ambiguous
-    -> leave unchanged and report the mismatch
-```
+- Add `InsertSalvageRepairAfter<TAnchor, TNew>()` for symmetry with text and
+  node repair configuration.
+- Keep duplicate detection and deterministic ordering unchanged.
 
-For object and array item schemas, compatibility includes nested required
-shape and child types, not merely the outer JSON kind. Nuwa must not report a
-successful array repair when the wrapped item remains invalid.
+### Markdown transport handling
 
-### Diagnostics and acceptance
+- Recognize the first valid closing fence line rather than requiring it to be
+  the final non-whitespace line.
+- Preserve the fenced JSON body while deliberately excluding trailing prose.
+- Cover backtick and tilde fences, longer closing markers, CRLF, whitespace,
+  and marker-like content inside the JSON body.
 
-- Record privacy-safe evidence for renames and coercions: path, source and
-  target names or types, deterministic similarity, compatibility, unique-best
-  selection, and validation improvement. Do not log original values by
-  default.
-- Ensure each accepted mutation improves Nuwa's supported structural schema
-  validation and does not discard information.
-- Cover nested objects, arrays of objects, collisions, ambiguous candidates,
-  unions, incompatible values, integer edge cases, rename-plus-coercion, and
-  reconciliation-before-pruning with behavioral tests.
-- Keep existing public APIs and repair behavior compatible; expose new policy
-  controls only where callers need to opt into broader inference.
+### Async and logging hygiene
+
+- Apply `ConfigureAwait(false)` consistently within library awaits and async
+  enumeration.
+- Avoid constructing repair summaries when the relevant log level is
+  disabled.
+
+### Missing behavioral coverage
+
+- Cover both AI expectation resolvers.
+- Cover `RepairJsonLookingTextWithoutResponseFormat` enabled and disabled.
+- Retain multi-target coverage on .NET 8, 9, and 10.
+
+## Architecture milestone — extensibility and predictable cost
+
+Implement these separately from the usability milestone because they affect
+construction, execution, or hot-path behavior.
+
+### Parser and strategy construction
+
+- Use the existing `ITolerantJsonSyntaxTreeParser` seam as an injected pipeline
+  dependency with a default implementation.
+- Design factory or instance-based strategy registration to replace the
+  fewest-constructor reflection heuristic without breaking existing fluent
+  configuration.
+- Consolidate duplicated text, salvage, and node phase bookkeeping only when
+  causal reporting and skipped-strategy behavior remain explicit.
+
+### Schema expectation reuse
+
+- Memoize property and item expectations so recursive repair does not
+  repeatedly normalize the same schema nodes.
+- Define cache ownership and mutation semantics first because `Schema` is
+  currently publicly reachable as a mutable `JsonNode`.
+- Cache AI tool expectations by tool identity and schema identity where the
+  connector exposes stable references.
+
+### Parsing and allocation performance
+
+- Add lazy token memoization so repeated lookahead does not re-lex the same
+  offsets.
+- Replace repeated string reconstruction in template/verbatim strategies with
+  bounded single-pass builders where benchmarks show value.
+- Reuse parse results inside salvage strategies.
+- Avoid full-tree clones for node strategies that can determine
+  `NotApplicable` with a dry run.
+- Remove redundant `JsonNode` serialization/parsing on trusted internal
+  success paths while keeping validation on public factories.
+- Add adversarial benchmarks before and after each hot-path optimization.
+
+### Unified limits and causality
+
+- Extend the shared operation context to text-strategy work where iteration or
+  speculative search is not already explicitly bounded.
+- Ensure failure results cannot bypass output limits.
+- Make `SucceededBy` identify the strategy that causally changed the accepted
+  artifact rather than relying on report position.
+
+## Later public API design
+
+These items should be designed together to avoid accumulating loosely related
+diagnostic properties.
+
+### Typed repair evidence
+
+- Introduce a privacy-safe evidence model suitable for telemetry, containing
+  path, operation kind, matching reason, deterministic distance where
+  relevant, unique-best decision, and before/after validation counts.
+- Keep `StrategyReport.Note` for compatibility and human-readable summaries.
+- Never include original property values or payload fragments by default.
+
+### Structured limit failures
+
+- Add limit kind, configured limit, and observed value to
+  `JsonRepairLimitException` so callers can react without parsing messages.
+- Preserve the existing exception type and message behavior where practical.
+
+### Invalid schema diagnostics
+
+- Replace the silent `FromSchemaJson` parse downgrade with an explicit
+  diagnostic or a separate throwing/try-create API.
+- Do not turn malformed schemas into payload repair failures without an
+  intentional compatibility decision.
+
+## Deferred investigations
+
+- Duplicate-property recovery policy: retain strict failure or adopt
+  deterministic last-wins behavior with an explicit correction record.
+- Full JSON Schema keyword validation. Nuwa currently validates the structural
+  subset needed to make safe repairs; it is not intended to replace a
+  dedicated dialect-aware validator.
+- Property-based fuzzing and long-running adversarial test corpora.
+- File-based public API analyzer baselines versus the existing reflection
+  snapshot test.
+- Repository-wide `.editorconfig` and CI format verification.
+
+## Acceptance principles
+
+- Every accepted mutation must preserve information or be explicitly
+  classified as lossy.
+- Schema-guided mutations must improve Nuwa's supported validation result.
+- Ambiguity must be reported or left unrepaired, never guessed.
+- Normal APIs remain deterministic and provider-independent.
+- Diagnostics remain bounded and privacy-safe.
+- Disabled optional behavior must remain inexpensive.
+- New public API requires contract tests and migration-safe defaults.

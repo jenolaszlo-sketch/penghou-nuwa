@@ -522,8 +522,8 @@ public sealed class MyNodeStrategy : INodeRepair
 
 ## Roadmap
 
-See the [roadmap](ROADMAP.md) for planned conservative schema reconciliation
-and coercion hardening.
+See the [roadmap](ROADMAP.md) for shipped foundations, upcoming usability
+work, architecture improvements, and later public API design.
 
 ## Feedback and attribution
 

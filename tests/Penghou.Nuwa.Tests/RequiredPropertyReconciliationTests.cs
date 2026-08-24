@@ -133,6 +133,19 @@ public sealed class RequiredPropertyReconciliationTests
     }
 
     [Fact]
+    public async Task StrongNameMatch_WithInvalidEnumValue_IsRefused()
+    {
+        const string schema = """
+            {"type":"object","required":["status"],"properties":{"status":{"type":"string","enum":["active","inactive"]}}}
+            """;
+
+        var result = await RepairAsync("""{"stats":"unknown"}""", schema);
+
+        result.ShapeStatus.Should().Be(JsonRepairShapeStatus.Mismatched);
+        result.Root!.AsObject().Should().ContainKey("stats");
+    }
+
+    [Fact]
     public async Task ReconciliationRunsBeforeUnknownPropertyPruning()
     {
         const string schema = """
@@ -152,6 +165,29 @@ public sealed class RequiredPropertyReconciliationTests
 
         result.ShapeStatus.Should().Be(JsonRepairShapeStatus.Matched);
         result.Root!["query"]!.GetValue<string>().Should().Be("value");
+    }
+
+    [Fact]
+    public async Task DiagnosticEvidence_IsBounded()
+    {
+        var properties = Enumerable.Range(0, 10)
+            .Select(index => $"\"field{index:0000}x\":{{\"type\":\"string\"}}")
+            .ToArray();
+        var required = Enumerable.Range(0, 10)
+            .Select(index => $"\"field{index:0000}x\"")
+            .ToArray();
+        var input = "{" + string.Join(",", Enumerable.Range(0, 10)
+            .Select(index => $"\"field{index:0000}\":\"value\"")) + "}";
+        var schema = "{\"type\":\"object\",\"required\":[" +
+            string.Join(",", required) + "],\"properties\":{" +
+            string.Join(",", properties) + "}}";
+
+        var result = await RepairAsync(input, schema);
+
+        result.ShapeStatus.Should().Be(JsonRepairShapeStatus.Matched);
+        result.NodeRepairs.Single(report =>
+                report.Name == "schema-guided-required-property-reconciliation")
+            .Note.Should().Contain("2 additional mappings omitted");
     }
 
     private static async Task<JsonRepairResult> RepairAsync(

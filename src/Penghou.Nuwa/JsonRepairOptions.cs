@@ -144,18 +144,14 @@ public sealed class JsonRepairOptions
         if (_nodeRepairs.Contains(strategyType))
             return this;
 
-        var coercionTypes = new HashSet<Type>
-        {
+        InsertBeforeFirst(
+            strategyType,
+            typeof(SchemaGuidedStructuralPropertyReconciliationStrategy),
             typeof(SchemaGuidedArrayWrapStrategy),
             typeof(SchemaGuidedStringToNumberCoercionStrategy),
             typeof(SchemaGuidedStringToBooleanCoercionStrategy),
             typeof(SchemaGuidedEnumFuzzyMatchStrategy),
-            typeof(SchemaGuidedUnknownPropertyPruneStrategy)
-        };
-        var insertionIndex = _nodeRepairs.FindIndex(coercionTypes.Contains);
-        _nodeRepairs.Insert(
-            insertionIndex < 0 ? _nodeRepairs.Count : insertionIndex,
-            strategyType);
+            typeof(SchemaGuidedUnknownPropertyPruneStrategy));
         return this;
     }
 
@@ -172,19 +168,23 @@ public sealed class JsonRepairOptions
         if (_nodeRepairs.Contains(strategyType))
             return this;
 
-        var coercionTypes = new HashSet<Type>
-        {
+        InsertBeforeFirst(
+            strategyType,
             typeof(SchemaGuidedArrayWrapStrategy),
             typeof(SchemaGuidedStringToNumberCoercionStrategy),
             typeof(SchemaGuidedStringToBooleanCoercionStrategy),
             typeof(SchemaGuidedEnumFuzzyMatchStrategy),
-            typeof(SchemaGuidedUnknownPropertyPruneStrategy)
-        };
-        var insertionIndex = _nodeRepairs.FindIndex(coercionTypes.Contains);
+            typeof(SchemaGuidedUnknownPropertyPruneStrategy));
+        return this;
+    }
+
+    private void InsertBeforeFirst(Type strategyType, params Type[] anchors)
+    {
+        var anchorSet = anchors.ToHashSet();
+        var insertionIndex = _nodeRepairs.FindIndex(anchorSet.Contains);
         _nodeRepairs.Insert(
             insertionIndex < 0 ? _nodeRepairs.Count : insertionIndex,
             strategyType);
-        return this;
     }
 
     public JsonRepairOptions AddNodeRepair<T>() where T : class, INodeRepair

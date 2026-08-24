@@ -23,67 +23,18 @@ public sealed class SchemaGuidedStructuralPropertyReconciliationStrategy
 
         var repaired = node.DeepClone();
         var evidence = new List<string>();
-        var changed = RepairNode(
+        var changed = SchemaReconciliationTraversal.Repair(
             repaired,
             expectation,
             "$",
-            evidence,
+            (value, effective, path) =>
+                ReconcileObject(value, effective, path, evidence),
             cancellationToken);
 
         return new(new NodeRepairAttempt(
             changed ? RepairOutcome.Repaired : RepairOutcome.NotApplicable,
             changed ? repaired : null,
-            changed ? string.Join("; ", evidence) : null));
-    }
-
-    private static bool RepairNode(
-        JsonNode node,
-        JsonSchemaExpectation expectation,
-        string path,
-        ICollection<string> evidence,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var effective = expectation.TryResolveBranch(node);
-        if (effective is null)
-            return false;
-
-        var changed = false;
-        if (node is JsonObject value)
-        {
-            changed |= ReconcileObject(value, effective, path, evidence);
-            foreach (var property in value.ToArray())
-            {
-                if (property.Value is null ||
-                    effective.GetProperty(property.Key) is not { } child)
-                    continue;
-
-                changed |= RepairNode(
-                    property.Value,
-                    child,
-                    $"{path}.{property.Key}",
-                    evidence,
-                    cancellationToken);
-            }
-        }
-        else if (node is JsonArray array &&
-                 effective.GetItem() is { } itemExpectation)
-        {
-            for (var index = 0; index < array.Count; index++)
-            {
-                if (array[index] is { } item)
-                {
-                    changed |= RepairNode(
-                        item,
-                        itemExpectation,
-                        $"{path}[{index}]",
-                        evidence,
-                        cancellationToken);
-                }
-            }
-        }
-
-        return changed;
+            changed ? SchemaRepairDiagnostics.Join(evidence) : null));
     }
 
     private static bool ReconcileObject(
@@ -163,18 +114,64 @@ public sealed class SchemaGuidedStructuralPropertyReconciliationStrategy
         JsonNode value,
         JsonSchemaExpectation target)
     {
-        if (target.ExpectedKind is JsonSchemaFieldKind.Object or JsonSchemaFieldKind.Array &&
+        if (target.ExpectedKind == JsonSchemaFieldKind.Object &&
+            value is JsonObject objectValue &&
+            HasDistinctiveObjectEvidence(objectValue, target) &&
             target.ValidateShape(value).Count == 0)
         {
-            return target.ExpectedKind == JsonSchemaFieldKind.Object
-                ? "distinctive object shape"
-                : "distinctive array-item shape";
+            return "distinctive object shape";
+        }
+
+        if (target.ExpectedKind == JsonSchemaFieldKind.Array &&
+            value is JsonArray { Count: > 0 } arrayValue &&
+            HasDistinctiveArrayEvidence(arrayValue, target) &&
+            target.ValidateShape(value).Count == 0)
+        {
+            return "distinctive array-item shape";
         }
 
         return IsExactEnumMember(value, target.Schema)
             ? "exact enum membership"
             : null;
     }
+
+    private static bool HasDistinctiveObjectEvidence(
+        JsonObject value,
+        JsonSchemaExpectation target)
+    {
+        var required = target.GetRequiredPropertyNames();
+        if (required.Any(value.ContainsKey))
+            return true;
+
+        if (target.Schema is not JsonObject schemaObject ||
+            schemaObject["properties"] is not JsonObject properties)
+            return false;
+
+        return value.Any(property =>
+            properties[property.Key] is JsonObject propertySchema &&
+            HasValueConstraint(propertySchema));
+    }
+
+    private static bool HasDistinctiveArrayEvidence(
+        JsonArray value,
+        JsonSchemaExpectation target)
+    {
+        var item = target.GetItem();
+        if (item is null)
+            return false;
+
+        return value.All(element =>
+            element is not null &&
+            (element is JsonObject objectElement
+                ? HasDistinctiveObjectEvidence(objectElement, item)
+                : item.Schema is JsonObject itemSchema &&
+                    HasValueConstraint(itemSchema)));
+    }
+
+    private static bool HasValueConstraint(JsonObject schema) =>
+        schema.ContainsKey("const") ||
+        schema.ContainsKey("enum") ||
+        schema["type"] is not null;
 
     private static bool IsExactEnumMember(JsonNode value, JsonNode? schema) =>
         schema is JsonObject schemaObject &&

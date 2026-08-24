@@ -15,7 +15,10 @@ public sealed record JsonRepairLimits
     /// <summary>Maximum nesting depth accepted by tolerant recovery.</summary>
     public int MaxDepth { get; init; } = 128;
 
-    /// <summary>Maximum number of corrections tolerant recovery may apply.</summary>
+    /// <summary>
+    /// Maximum number of tolerant-parser and node-tree corrections a repair
+    /// operation may apply.
+    /// </summary>
     public int MaxCorrections { get; init; } = 10_000;
 
     internal void Validate()

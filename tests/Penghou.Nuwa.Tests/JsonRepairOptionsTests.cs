@@ -164,6 +164,32 @@ public sealed class JsonRepairOptionsTests
             typeof(NoopNodeRepair));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ReconciliationPolicies_HaveCanonicalOrderRegardlessOfCallOrder(
+        bool enableStructuralFirst)
+    {
+        var options = new JsonRepairOptions();
+        options.EnableSchemaCoercions();
+        if (enableStructuralFirst)
+        {
+            options.EnableStructuralPropertyReconciliation();
+            options.EnableRequiredPropertyReconciliation();
+        }
+        else
+        {
+            options.EnableRequiredPropertyReconciliation();
+            options.EnableStructuralPropertyReconciliation();
+        }
+
+        options.NodeRepairs.Should().ContainInOrder(
+            typeof(SchemaGuidedRequiredPropertyReconciliationStrategy),
+            typeof(SchemaGuidedStructuralPropertyReconciliationStrategy),
+            typeof(SchemaGuidedArrayWrapStrategy),
+            typeof(SchemaGuidedUnknownPropertyPruneStrategy));
+    }
+
     [Fact]
     public void RemoveNodeRepair_ThrowsWhenNotRegistered()
     {

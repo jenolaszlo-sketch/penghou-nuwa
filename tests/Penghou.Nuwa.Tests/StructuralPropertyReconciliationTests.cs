@@ -66,6 +66,39 @@ public sealed class StructuralPropertyReconciliationTests
     }
 
     [Fact]
+    public async Task EmptyArray_IsNotDistinctiveItemShapeEvidence()
+    {
+        using var result = await RepairAsync(
+            """{"payload":[]}""",
+            """{"type":"object","required":["products"],"properties":{"products":{"type":"array","items":{"type":"object","required":["sku"],"properties":{"sku":{"type":"string"}}}}}}""");
+
+        result.ShapeStatus.Should().Be(JsonRepairShapeStatus.Mismatched);
+        result.Root!.AsObject().Should().ContainKey("payload");
+    }
+
+    [Fact]
+    public async Task UnconstrainedObject_IsNotDistinctiveShapeEvidence()
+    {
+        using var result = await RepairAsync(
+            """{"payload":{"anything":true}}""",
+            """{"type":"object","required":["metadata"],"properties":{"metadata":{"type":"object"}}}""");
+
+        result.ShapeStatus.Should().Be(JsonRepairShapeStatus.Mismatched);
+        result.Root!.AsObject().Should().ContainKey("payload");
+    }
+
+    [Fact]
+    public async Task ArrayWithUnconstrainedItems_IsNotDistinctiveShapeEvidence()
+    {
+        using var result = await RepairAsync(
+            """{"payload":[{"anything":true}]}""",
+            """{"type":"object","required":["items"],"properties":{"items":{"type":"array","items":{}}}}""");
+
+        result.ShapeStatus.Should().Be(JsonRepairShapeStatus.Mismatched);
+        result.Root!.AsObject().Should().ContainKey("payload");
+    }
+
+    [Fact]
     public async Task MultipleSourcesForOneTarget_AreRefused()
     {
         using var result = await RepairAsync(
@@ -99,6 +132,27 @@ public sealed class StructuralPropertyReconciliationTests
 
         result.ShapeStatus.Should().Be(JsonRepairShapeStatus.Mismatched);
         result.Root!.AsObject().Should().ContainKey("payload");
+    }
+
+    [Fact]
+    public async Task StructuralInference_HasLowerConfidenceThanStrongNameMatch()
+    {
+        const string schema = """
+            {"type":"object","required":["forecast"],"properties":{"forecast":{"type":"object","required":["city"],"properties":{"city":{"type":"string"}}}}}
+            """;
+        var structural = await RepairAsync(
+            """{"payload":{"city":"Manila"}}""",
+            schema);
+        var namedPipeline = JsonRepairPipeline.Create(options =>
+            options.EnableRequiredPropertyReconciliation());
+        using var named = await namedPipeline.RepairAsync(
+            """{"forecat":{"city":"Manila"}}""",
+            JsonSchemaExpectation.FromSchemaJson(schema),
+            TestContext.Current.CancellationToken);
+        using (structural)
+        {
+            structural.Confidence.Should().BeLessThan(named.Confidence);
+        }
     }
 
     private static async Task<JsonRepairResult> RepairAsync(
