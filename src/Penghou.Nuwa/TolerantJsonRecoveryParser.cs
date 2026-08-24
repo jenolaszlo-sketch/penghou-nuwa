@@ -15,6 +15,9 @@ internal sealed class TolerantJsonRecoveryParser(
     JsonRepairLimits limits,
     CancellationToken cancellationToken)
 {
+    /// <summary>Hard ceiling on nesting depth regardless of configuration, because each open container consumes CLR stack.</summary>
+    internal const int HardMaxDepth = 512;
+
     private readonly TolerantJsonTokenReader _reader =
         new(input);
     private readonly Stack<JsonTokenKind> _closers =
@@ -24,6 +27,32 @@ internal sealed class TolerantJsonRecoveryParser(
     private readonly List<string> _repairs =
         [];
     private int _schemaStringRepairCount;
+    private readonly int maxDepth =
+        Math.Min(limits.MaxDepth, HardMaxDepth);
+    private readonly int maxCorrections =
+        Math.Min(limits.MaxCorrections, HardMaxCorrections);
+
+    /// <summary>Creates a nested parser that shares a bounded slice of the parent's correction budget.</summary>
+    internal TolerantJsonRecoveryParser(
+        string input,
+        JsonSchemaExpectation? expectation,
+        JsonRepairLimits limits,
+        int remainingCorrectionBudget,
+        int depthAllowance,
+        CancellationToken cancellationToken)
+        : this(
+            input,
+            expectation,
+            limits with
+            {
+                MaxCorrections = Math.Min(limits.MaxCorrections, Math.Max(1, remainingCorrectionBudget)),
+                MaxDepth = Math.Min(limits.MaxDepth, Math.Max(1, depthAllowance))
+            },
+            cancellationToken)
+    {
+    }
+
+    private const int HardMaxCorrections = 100_000;
 
     public TolerantJsonRecoveryResult Parse()
     {
@@ -599,11 +628,22 @@ internal sealed class TolerantJsonRecoveryParser(
                         value.ToString()));
             }
 
+            // Decode common escapes instead of appending the next raw
+            // character, which silently corrupted input (\n became "n").
             if (current == '\\' &&
                 !_reader.IsAtEnd)
             {
-                value.Append(
-                    _reader.Current);
+                var escaped = _reader.Current;
+                value.Append(escaped switch
+                {
+                    'n' => '\n',
+                    't' => '\t',
+                    'r' => '\r',
+                    'b' => '\b',
+                    'f' => '\f',
+                    '0' => '\0',
+                    var other => other
+                });
                 _reader.AdvanceCharacter();
                 continue;
             }
@@ -791,13 +831,19 @@ internal sealed class TolerantJsonRecoveryParser(
                 ? expectation.GetItem()
                 : expectation;
 
-        var recovery =
-            new TolerantJsonRecoveryParser(
-                    innerText,
-                    childExpectation,
-                    limits,
-                    cancellationToken)
-                .Parse();
+        // Nested parses share the parent's remaining correction budget and a
+        // depth allowance bounded by the enclosing depth, so double-encoded
+        // levels cannot reset the resource limits.
+        var recovery = new TolerantJsonRecoveryParser(
+                innerText,
+                childExpectation,
+                limits,
+                remainingCorrectionBudget:
+                    maxCorrections - _repairs.Count,
+                depthAllowance:
+                    Math.Max(1, maxDepth - _closers.Count),
+                cancellationToken)
+            .Parse();
 
         if (recovery.Root is null ||
             !MatchesContainerKind(
@@ -1005,6 +1051,8 @@ internal sealed class TolerantJsonRecoveryParser(
         };
     }
 
+    private const int MaxPropertyLookahead = 1024;
+
     private bool LooksLikePropertyAt(
         int start)
     {
@@ -1029,8 +1077,13 @@ internal sealed class TolerantJsonRecoveryParser(
         var position = token.End;
         var escaped = false;
 
-        while (position <
-               _reader.Source.Length)
+        // Bound the raw quote scan so adversarial inputs cannot turn every
+        // property/value boundary into an end-of-input walk.
+        var scanEnd = Math.Min(
+            _reader.Source.Length,
+            token.End + MaxPropertyLookahead);
+
+        while (position < scanEnd)
         {
             var current =
                 _reader.Source[position++];
@@ -1376,10 +1429,10 @@ internal sealed class TolerantJsonRecoveryParser(
         string action)
     {
         CheckWork();
-        if (_repairs.Count >= limits.MaxCorrections)
+        if (_repairs.Count >= maxCorrections)
         {
             throw new JsonRepairLimitException(
-                $"Tolerant recovery exceeded the maximum of {limits.MaxCorrections} corrections.");
+                $"Tolerant recovery exceeded the maximum of {maxCorrections} corrections.");
         }
 
         _repairs.Add($"offset {position}: {action}");
@@ -1388,10 +1441,10 @@ internal sealed class TolerantJsonRecoveryParser(
     private void EnsureCanEnterContainer()
     {
         CheckWork();
-        if (_closers.Count >= limits.MaxDepth)
+        if (_closers.Count >= maxDepth)
         {
             throw new JsonRepairLimitException(
-                $"Tolerant recovery exceeded the maximum nesting depth of {limits.MaxDepth}.");
+                $"Tolerant recovery exceeded the maximum nesting depth of {maxDepth}.");
         }
     }
 

@@ -150,6 +150,34 @@ public sealed class JsonRepairChatClientTests
     }
 
     [Fact]
+    public async Task GetResponseAsync_ScalarProseUnderJsonResponseFormat_IsNotRewritten()
+    {
+        // Salvage quoting can turn free-form assistant prose into valid JSON
+        // scalars ("True" -> true). Without a schema contract that mutation is
+        // data loss and must be suppressed.
+        const string prose = "True";
+        var inner = new FakeChatClient(
+            new ChatResponse(
+                new ChatMessage(
+                    ChatRole.Assistant,
+                    [new TextContent(prose)])));
+
+        var options = new ChatOptions
+        {
+            ResponseFormat = ChatResponseFormat.Json
+        };
+
+        var response = await inner.UseJsonRepair().GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "is it on?")],
+            options,
+            TestContext.Current.CancellationToken);
+
+        response.Messages[0].Contents[0]
+            .Should().BeOfType<TextContent>()
+            .Which.Text.Should().Be(prose);
+    }
+
+    [Fact]
     public async Task GetResponseAsync_RepairsMarkdownFenceForStructuredRequest()
     {
         var inner = new FakeChatClient(

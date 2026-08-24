@@ -329,10 +329,28 @@ public class JsonRepairChatClient : DelegatingChatClient
         if (result.Succeeded &&
             result.WasRepaired &&
             result.ShapeStatus != JsonRepairShapeStatus.Mismatched &&
-            result.RepairedText is { } repaired)
+            result.RepairedText is { } repaired &&
+            IsPlausibleReplacement(repaired, expectation))
         {
             text.Text = repaired;
         }
+    }
+
+    /// <summary>
+    /// Guards assistant prose against silent mutation. Without a schema
+    /// expectation, only structurally plausible repairs (object or array roots)
+    /// may replace message text — otherwise free-form prose like "True" or
+    /// "None" would be rewritten to JSON literals by salvage quoting.
+    /// </summary>
+    private static bool IsPlausibleReplacement(
+        string repaired,
+        JsonSchemaExpectation? expectation)
+    {
+        if (expectation is not null)
+            return true;
+
+        var trimmed = repaired.TrimStart();
+        return trimmed.StartsWith('{') || trimmed.StartsWith('[');
     }
 
     private ValueTask NotifyAsync(

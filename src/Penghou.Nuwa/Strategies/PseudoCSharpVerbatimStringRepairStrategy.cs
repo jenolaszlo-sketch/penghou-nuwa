@@ -11,6 +11,13 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategy
     private const int MaxRepairs = 32;
     private const int MaxCandidatesPerLiteral = 64;
 
+    /// <summary>
+    /// Total speculative candidate expansions permitted across the entire
+    /// recursion. Without this bound, adversarial inputs containing many
+    /// verbatim-string starts could drive effectively unbounded CPU.
+    /// </summary>
+    internal const int MaxTotalExpansions = 2048;
+
     public ValueTask<TextRepairAttempt> RepairAsync(
         string input,
         CancellationToken cancellationToken = default)
@@ -33,7 +40,12 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategy
                 null));
         }
 
-        var changed = TryRepair(input, out var repaired);
+        var budget = MaxTotalExpansions;
+        var changed = TryRepair(
+            input,
+            ref budget,
+            cancellationToken,
+            out var repaired);
 
         return new(new TextRepairAttempt(
             changed
@@ -42,14 +54,24 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategy
             changed ? repaired : null));
     }
 
-    private static bool TryRepair(string input, out string repaired)
+    private static bool TryRepair(
+        string input,
+        ref int budget,
+        CancellationToken cancellationToken,
+        out string repaired)
     {
         repaired = input;
 
         if (string.IsNullOrWhiteSpace(input))
             return false;
 
-        if (!TryRepairFrom(input, searchStart: 0, depth: 0, out var candidate))
+        if (!TryRepairFrom(
+                input,
+                searchStart: 0,
+                depth: 0,
+                ref budget,
+                cancellationToken,
+                out var candidate))
             return false;
 
         repaired = candidate;
@@ -62,7 +84,13 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategy
         return !string.Equals(repaired, input, StringComparison.Ordinal);
     }
 
-    private static bool TryRepairFrom(string text, int searchStart, int depth, out string repaired)
+    private static bool TryRepairFrom(
+        string text,
+        int searchStart,
+        int depth,
+        ref int budget,
+        CancellationToken cancellationToken,
+        out string repaired)
     {
         repaired = text;
 
@@ -84,6 +112,12 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategy
 
         foreach (var end in endCandidates)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (budget <= 0)
+                return false;
+            budget--;
+
             var value = text[contentStart..end].Replace("\"\"", "\"");
             var jsonString = JsonSerializer.Serialize(value);
             var candidate = text[..start] + jsonString + text[(end + 1)..];
@@ -96,7 +130,13 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategy
 
             bestPartial ??= candidate;   // keep the nearest-split conversion even if not fully valid yet
 
-            if (TryRepairFrom(candidate, start + jsonString.Length, depth + 1, out var nested))
+            if (TryRepairFrom(
+                    candidate,
+                    start + jsonString.Length,
+                    depth + 1,
+                    ref budget,
+                    cancellationToken,
+                    out var nested))
             {
                 repaired = nested;
                 return true;
@@ -109,7 +149,13 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategy
             return true;   // changed, not yet valid — the fallback handles the rest
         }
 
-        return TryRepairFrom(text, start + 2, depth, out repaired);
+        return TryRepairFrom(
+            text,
+            start + 2,
+            depth,
+            ref budget,
+            cancellationToken,
+            out repaired);
     }
 
     private static int FindNextPseudoVerbatimStart(string text, int searchStart)
