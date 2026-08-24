@@ -42,8 +42,14 @@ public sealed class PublicApiContractTests
           property System.Collections.Generic.IReadOnlyList<System.Type> SalvageRepairs
           property System.Collections.Generic.IReadOnlyList<System.Type> TextRepairs
           method Penghou.Nuwa.JsonRepairOptions AddNodeRepair<T>()
+          method Penghou.Nuwa.JsonRepairOptions AddNodeRepair<T>(System.Func<T>)
+          method Penghou.Nuwa.JsonRepairOptions AddNodeRepair(Penghou.Nuwa.Strategies.INodeRepair)
           method Penghou.Nuwa.JsonRepairOptions AddSalvageRepair<T>()
+          method Penghou.Nuwa.JsonRepairOptions AddSalvageRepair<T>(System.Func<T>)
+          method Penghou.Nuwa.JsonRepairOptions AddSalvageRepair(Penghou.Nuwa.Strategies.ITextRepair)
           method Penghou.Nuwa.JsonRepairOptions AddTextRepair<T>()
+          method Penghou.Nuwa.JsonRepairOptions AddTextRepair<T>(System.Func<T>)
+          method Penghou.Nuwa.JsonRepairOptions AddTextRepair(Penghou.Nuwa.Strategies.ITextRepair)
           method Penghou.Nuwa.JsonRepairOptions ClearNodeRepairs()
           method Penghou.Nuwa.JsonRepairOptions ClearTextRepairs()
           method Penghou.Nuwa.JsonRepairOptions DisableSalvageFallback()

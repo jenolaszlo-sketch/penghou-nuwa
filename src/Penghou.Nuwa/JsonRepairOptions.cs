@@ -13,6 +13,7 @@ public sealed class JsonRepairOptions
     private readonly List<Type> _textRepairs = [];
     private readonly List<Type> _salvageRepairs = [];
     private readonly List<Type> _nodeRepairs = [];
+    private readonly Dictionary<Type, Func<object>> _strategyFactories = [];
 
     public JsonRepairOptions()
     {
@@ -61,6 +62,13 @@ public sealed class JsonRepairOptions
         return this;
     }
 
+    public JsonRepairOptions AddTextRepair<T>(Func<T> factory)
+        where T : class, ITextRepair =>
+        AddFactory(_textRepairs, factory, "text repair");
+
+    public JsonRepairOptions AddTextRepair(ITextRepair instance) =>
+        AddInstance(_textRepairs, instance, "text repair");
+
     public JsonRepairOptions InsertTextRepairAfter<TAnchor, TNew>()
         where TAnchor : class, ITextRepair
         where TNew : class, ITextRepair
@@ -81,6 +89,7 @@ public sealed class JsonRepairOptions
 
     public JsonRepairOptions ClearTextRepairs()
     {
+        RemoveFactories(_textRepairs);
         _textRepairs.Clear();
         return this;
     }
@@ -90,6 +99,13 @@ public sealed class JsonRepairOptions
         _salvageRepairs.Add(typeof(T));
         return this;
     }
+
+    public JsonRepairOptions AddSalvageRepair<T>(Func<T> factory)
+        where T : class, ITextRepair =>
+        AddFactory(_salvageRepairs, factory, "salvage repair");
+
+    public JsonRepairOptions AddSalvageRepair(ITextRepair instance) =>
+        AddInstance(_salvageRepairs, instance, "salvage repair");
 
     public JsonRepairOptions InsertSalvageRepairAfter<TAnchor, TNew>()
         where TAnchor : class, ITextRepair
@@ -112,6 +128,7 @@ public sealed class JsonRepairOptions
     /// <summary>Disables the lossy fallback phase entirely.</summary>
     public JsonRepairOptions DisableSalvageFallback()
     {
+        RemoveFactories(_salvageRepairs);
         _salvageRepairs.Clear();
         return this;
     }
@@ -205,6 +222,13 @@ public sealed class JsonRepairOptions
         return this;
     }
 
+    public JsonRepairOptions AddNodeRepair<T>(Func<T> factory)
+        where T : class, INodeRepair =>
+        AddFactory(_nodeRepairs, factory, "node repair");
+
+    public JsonRepairOptions AddNodeRepair(INodeRepair instance) =>
+        AddInstance(_nodeRepairs, instance, "node repair");
+
     public JsonRepairOptions InsertNodeRepairAfter<TAnchor, TNew>()
         where TAnchor : class, INodeRepair
         where TNew : class, INodeRepair
@@ -225,6 +249,7 @@ public sealed class JsonRepairOptions
 
     public JsonRepairOptions ClearNodeRepairs()
     {
+        RemoveFactories(_nodeRepairs);
         _nodeRepairs.Clear();
         return this;
     }
@@ -239,6 +264,50 @@ public sealed class JsonRepairOptions
         ValidateStrategies(_textRepairs, typeof(ITextRepair), "text repair");
         ValidateStrategies(_salvageRepairs, typeof(ITextRepair), "salvage repair");
         ValidateStrategies(_nodeRepairs, typeof(INodeRepair), "node repair");
+    }
+
+    internal bool TryCreateStrategy(Type type, out object strategy)
+    {
+        if (_strategyFactories.TryGetValue(type, out var factory))
+        {
+            strategy = factory() ??
+                throw new InvalidOperationException(
+                    $"The strategy factory for '{type.Name}' returned null.");
+            return true;
+        }
+
+        strategy = null!;
+        return false;
+    }
+
+    private JsonRepairOptions AddFactory<T>(
+        List<Type> list,
+        Func<T> factory,
+        string label)
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        var type = typeof(T);
+        if (list.Contains(type))
+            throw new InvalidOperationException($"The {label} '{type.Name}' is already registered.");
+        list.Add(type);
+        _strategyFactories.Add(type, () => factory());
+        return this;
+    }
+
+    private JsonRepairOptions AddInstance<T>(
+        List<Type> list,
+        T instance,
+        string label)
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(instance);
+        var type = instance.GetType();
+        if (list.Contains(type))
+            throw new InvalidOperationException($"The {label} '{type.Name}' is already registered.");
+        list.Add(type);
+        _strategyFactories.Add(type, () => instance);
+        return this;
     }
 
     private static void InsertAfter(
@@ -264,7 +333,7 @@ public sealed class JsonRepairOptions
         list.Insert(index + 1, added);
     }
 
-    private static void Remove(
+    private void Remove(
         List<Type> list,
         Type type,
         string label)
@@ -274,9 +343,17 @@ public sealed class JsonRepairOptions
             throw new InvalidOperationException(
                 $"The {label} '{type.Name}' is not registered.");
         }
+
+        _strategyFactories.Remove(type);
     }
 
-    private static void ValidateStrategies(
+    private void RemoveFactories(IEnumerable<Type> types)
+    {
+        foreach (var type in types)
+            _strategyFactories.Remove(type);
+    }
+
+    private void ValidateStrategies(
         IReadOnlyList<Type> types,
         Type requiredInterface,
         string label)
@@ -289,7 +366,8 @@ public sealed class JsonRepairOptions
                     $"The {label} '{type.Name}' does not implement '{requiredInterface.Name}'.");
             }
 
-            if (!type
+            if (!_strategyFactories.ContainsKey(type) &&
+                !type
                     .GetConstructors(
                         BindingFlags.Instance |
                         BindingFlags.Public)

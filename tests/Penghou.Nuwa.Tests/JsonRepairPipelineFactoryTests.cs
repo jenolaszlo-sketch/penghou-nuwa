@@ -131,6 +131,30 @@ public sealed class JsonRepairPipelineFactoryTests
         act.Should().Throw<InvalidOperationException>();
     }
 
+    [Fact]
+    public void Create_UsesConfiguredStrategyFactoryWithoutReflection()
+    {
+        var pipeline = JsonRepairPipeline.Create(options =>
+            options.AddTextRepair(
+                () => new FactoryTextRepair("factory")));
+
+        using var result = Repair(pipeline, "factory");
+
+        result.Root!["source"]!.GetValue<string>().Should().Be("factory");
+    }
+
+    [Fact]
+    public void Create_UsesConfiguredStrategyInstance()
+    {
+        var strategy = new FactoryTextRepair("instance");
+        var pipeline = JsonRepairPipeline.Create(options =>
+            options.AddTextRepair(strategy));
+
+        using var result = Repair(pipeline, "instance");
+
+        result.Root!["source"]!.GetValue<string>().Should().Be("instance");
+    }
+
     private static JsonRepairResult Repair(
         IJsonRepairPipeline pipeline,
         string input,
@@ -156,5 +180,21 @@ public sealed class JsonRepairPipelineFactoryTests
             new(new TextRepairAttempt(
                 RepairOutcome.NotApplicable,
                 null));
+    }
+
+    private sealed class FactoryTextRepair(string expected) : ITextRepair
+    {
+        public string Name => "factory-text";
+
+        public ValueTask<TextRepairAttempt> RepairAsync(
+            string input,
+            CancellationToken cancellationToken = default) =>
+            input == expected
+                ? new(new TextRepairAttempt(
+                    RepairOutcome.Repaired,
+                    $"{{\"source\":\"{expected}\"}}"))
+                : new(new TextRepairAttempt(
+                    RepairOutcome.NotApplicable,
+                    null));
     }
 }

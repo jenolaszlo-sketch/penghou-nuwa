@@ -110,11 +110,14 @@ public sealed class JsonRepairPipeline
 
         return new JsonRepairPipeline(
             Instantiate<ITextRepair>(
-                options.TextRepairs),
+                options.TextRepairs,
+                options),
             Instantiate<ITextRepair>(
-                options.SalvageRepairs),
+                options.SalvageRepairs,
+                options),
             Instantiate<INodeRepair>(
-                options.NodeRepairs),
+                options.NodeRepairs,
+                options),
             NullLogger<JsonRepairPipeline>.Instance,
             options.Limits,
             options.AllowTruncationSalvage);
@@ -855,15 +858,17 @@ public sealed class JsonRepairPipeline
             reports.Select(report => $"{report.Name}={report.Status}"));
 
     private static IReadOnlyList<T> Instantiate<T>(
-        IReadOnlyList<Type> types)
+        IReadOnlyList<Type> types,
+        JsonRepairOptions options)
         where T : class
     {
         var repairs = new T[types.Count];
 
         for (var index = 0; index < types.Count; index++)
         {
-            repairs[index] = Instantiate<T>(
-                types[index]);
+            repairs[index] = options.TryCreateStrategy(types[index], out var configured)
+                ? (T)configured
+                : Instantiate<T>(types[index]);
         }
 
         return repairs;

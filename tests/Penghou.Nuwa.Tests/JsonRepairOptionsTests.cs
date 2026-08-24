@@ -234,12 +234,39 @@ public sealed class JsonRepairOptionsTests
                 "no public constructor");
     }
 
+    [Fact]
+    public void FactoryRegistration_AllowsStrategyWithoutPublicConstructor()
+    {
+        var options = new JsonRepairOptions();
+
+        options.AddTextRepair(() => NoPublicCtorRepair.Create());
+
+        var act = options.Validate;
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void RemovingFactoryRegistration_AllowsSameTypeToBeAddedAgain()
+    {
+        var options = new JsonRepairOptions();
+        options.AddTextRepair(() => NoPublicCtorRepair.Create());
+
+        options.RemoveTextRepair<NoPublicCtorRepair>();
+        options.AddTextRepair(() => NoPublicCtorRepair.Create());
+
+        options.Validate();
+        options.TextRepairs.Should().ContainSingle(type =>
+            type == typeof(NoPublicCtorRepair));
+    }
+
     private sealed class NoPublicCtorRepair
         : ITextRepair
     {
         private NoPublicCtorRepair()
         {
         }
+
+        public static NoPublicCtorRepair Create() => new();
 
         public string Name => "no-public-ctor";
 

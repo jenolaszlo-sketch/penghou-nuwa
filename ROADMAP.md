@@ -92,12 +92,12 @@ Completed in the first architecture slice:
 - Failure output is subject to the same output limit as successful repair.
 - AI response/tool schemas are cached per wrapped client by schema identity.
 - Optional-null removal performs a dry applicability scan before cloning.
+- Ordered strategy registration supports types, instances, and factories in
+  standalone and dependency-injection construction; reflection remains a
+  compatibility fallback.
 
 ### Parser and strategy construction
 
-- Design factory or instance-based strategy registration to replace the
-  fewest-constructor reflection heuristic without breaking existing fluent
-  configuration.
 - Consolidate duplicated text, salvage, and node phase bookkeeping only when
   causal reporting and skipped-strategy behavior remain explicit.
 

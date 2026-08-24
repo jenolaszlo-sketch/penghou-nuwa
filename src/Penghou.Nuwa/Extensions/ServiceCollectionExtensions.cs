@@ -26,12 +26,12 @@ public static class ServiceCollectionExtensions
                      .TextRepairs
                      .Concat(options.SalvageRepairs))
         {
-            services.AddSingleton(type);
+            RegisterStrategy(services, options, type);
         }
 
         foreach (var type in options.NodeRepairs)
         {
-            services.AddSingleton(type);
+            RegisterStrategy(services, options, type);
         }
 
         services.AddSingleton<IJsonRepairPipeline>(
@@ -60,6 +60,17 @@ public static class ServiceCollectionExtensions
             });
 
         return services;
+    }
+
+    private static void RegisterStrategy(
+        IServiceCollection services,
+        JsonRepairOptions options,
+        Type type)
+    {
+        if (options.TryCreateStrategy(type, out var configured))
+            services.AddSingleton(type, configured);
+        else
+            services.AddSingleton(type);
     }
 
     private static IReadOnlyList<T> ResolveRepairs<T>(

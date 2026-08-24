@@ -520,6 +520,25 @@ public sealed class MyNodeStrategy : INodeRepair
 }
 ```
 
+Strategies may be registered by type, instance, or factory. Instance and
+factory registration avoids reflection and supports dependencies captured by
+the host while preserving explicit strategy order:
+
+```csharp
+var pipeline = JsonRepairPipeline.Create(options =>
+{
+    options.AddNodeRepair(new MyNodeStrategy());
+});
+
+// A factory is useful when construction captures host-owned dependencies:
+var otherPipeline = JsonRepairPipeline.Create(options =>
+    options.AddNodeRepair(() => new MyNodeStrategy()));
+```
+
+The existing `AddTextRepair<T>()`, `AddSalvageRepair<T>()`, and
+`AddNodeRepair<T>()` APIs remain available. Constructor-based creation is now
+the compatibility fallback rather than the only standalone construction path.
+
 ## Roadmap
 
 See the [roadmap](ROADMAP.md) for shipped foundations, upcoming usability
