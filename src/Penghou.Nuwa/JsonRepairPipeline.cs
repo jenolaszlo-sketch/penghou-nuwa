@@ -377,63 +377,22 @@ public sealed class JsonRepairPipeline
         }
 
         // Ordered text-repair phase.
-        var successIndex = -1;
+        JsonNode? repairedRoot = null;
+        var textPhase = await RunTextPhaseAsync(
+            _textRepairs,
+            current,
+            textReports,
+            candidate => TryParseNode(candidate, out repairedRoot),
+            cancellationToken).ConfigureAwait(false);
+        current = textPhase.Current;
+        textWasRepaired |= textPhase.WasRepaired;
 
-        for (var index = 0; index < _textRepairs.Count; index++)
+        if (textPhase.Accepted)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var strategy = _textRepairs[index];
-            var repair = await TryRepairAsync(
-                strategy,
-                current,
-                cancellationToken).ConfigureAwait(false);
-
-            if (repair.Error is not null)
-            {
-                textReports.Add(new StrategyReport(
-                    strategy.Name,
-                    StrategyStatus.Failed,
-                    Note: repair.Error));
-                continue;
-            }
-
-            var attempt = repair.Attempt;
-            var report = ReportTextAttempt(
-                strategy.Name,
-                attempt,
-                current);
-            textReports.Add(report);
-
-            if (report.Status != StrategyStatus.Succeeded)
-            {
-                continue;
-            }
-
-            current = attempt.Repaired!;
-            textWasRepaired = true;
-
-            if (TryParseNode(current, out root))
-            {
-                successIndex = index;
-                break;
-            }
-        }
-
-        if (successIndex >= 0)
-        {
-            for (var index = successIndex + 1;
-                 index < _textRepairs.Count;
-                 index++)
-            {
-                textReports.Add(new StrategyReport(
-                    _textRepairs[index].Name,
-                    StrategyStatus.Skipped));
-            }
-
             ReportSkipped(textReports, _salvageRepairs);
 
             return await CreateResultAsync(
-                root!,
+                repairedRoot!,
                 expectation,
                 textReports,
                 textWasRepaired,
@@ -453,67 +412,24 @@ public sealed class JsonRepairPipeline
 
         if (tolerantParse.Root is null)
         {
-            var salvageSuccessIndex = -1;
-
-            for (var index = 0; index < _salvageRepairs.Count; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var strategy = _salvageRepairs[index];
-                var repair = await TryRepairAsync(
-                    strategy,
-                    current,
-                    cancellationToken).ConfigureAwait(false);
-
-                if (repair.Error is not null)
+            var salvagePhase = await RunTextPhaseAsync(
+                _salvageRepairs,
+                current,
+                textReports,
+                candidate =>
                 {
-                    textReports.Add(new StrategyReport(
-                        strategy.Name,
-                        StrategyStatus.Failed,
-                        Note: repair.Error));
-                    continue;
-                }
-
-                var attempt = repair.Attempt;
-                var report = ReportTextAttempt(
-                    strategy.Name,
-                    attempt,
-                    current);
-                textReports.Add(report);
-
-                if (report.Status != StrategyStatus.Succeeded)
-                {
-                    continue;
-                }
-
-                current = attempt.Repaired!;
-                textWasRepaired = true;
-
-                tolerantParse =
-                    _tolerantParser.Parse(
-                        current,
+                    tolerantParse =
+                        _tolerantParser.Parse(
+                        candidate,
                         expectation,
                         _limits,
                         cancellationToken,
                         _allowTruncationSalvage);
-
-                if (tolerantParse.Root is not null)
-                {
-                    salvageSuccessIndex = index;
-                    break;
-                }
-            }
-
-            if (salvageSuccessIndex >= 0)
-            {
-                for (var index = salvageSuccessIndex + 1;
-                     index < _salvageRepairs.Count;
-                     index++)
-                {
-                    textReports.Add(new StrategyReport(
-                        _salvageRepairs[index].Name,
-                        StrategyStatus.Skipped));
-                }
-            }
+                    return tolerantParse.Root is not null;
+                },
+                cancellationToken).ConfigureAwait(false);
+            current = salvagePhase.Current;
+            textWasRepaired |= salvagePhase.WasRepaired;
         }
         else
         {
@@ -547,6 +463,56 @@ public sealed class JsonRepairPipeline
             cancellationToken).ConfigureAwait(false);
     }
 
+    private static async ValueTask<TextPhaseResult> RunTextPhaseAsync(
+        IReadOnlyList<ITextRepair> strategies,
+        string current,
+        ICollection<StrategyReport> reports,
+        Func<string, bool> accept,
+        CancellationToken cancellationToken)
+    {
+        var wasRepaired = false;
+        for (var index = 0; index < strategies.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var strategy = strategies[index];
+            var repair = await TryRepairAsync(
+                strategy,
+                current,
+                cancellationToken).ConfigureAwait(false);
+
+            if (repair.Error is not null)
+            {
+                reports.Add(new StrategyReport(
+                    strategy.Name,
+                    StrategyStatus.Failed,
+                    Note: repair.Error));
+                continue;
+            }
+
+            var attempt = repair.Attempt;
+            var report = ReportTextAttempt(strategy.Name, attempt, current);
+            reports.Add(report);
+            if (report.Status != StrategyStatus.Succeeded)
+                continue;
+
+            current = attempt.Repaired!;
+            wasRepaired = true;
+            if (!accept(current))
+                continue;
+
+            for (var skipped = index + 1; skipped < strategies.Count; skipped++)
+            {
+                reports.Add(new StrategyReport(
+                    strategies[skipped].Name,
+                    StrategyStatus.Skipped));
+            }
+
+            return new TextPhaseResult(current, wasRepaired, Accepted: true);
+        }
+
+        return new TextPhaseResult(current, wasRepaired, Accepted: false);
+    }
+
     private async ValueTask<JsonRepairResult> CreateResultAsync(
         JsonNode root,
         JsonSchemaExpectation? expectation,
@@ -556,66 +522,16 @@ public sealed class JsonRepairPipeline
         TolerantJsonSyntaxTreeParseResult? tolerantParse,
         CancellationToken cancellationToken)
     {
-        var nodeReports = new List<StrategyReport>();
-        var current = root;
-        var nodeWasRepaired = false;
-        var correctionCount = tolerantParse?.CorrectionCount ?? 0;
-        if (expectation is not null)
-        {
-            foreach (var strategy in _nodeRepairs)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                NodeRepairAttempt attempt;
-
-                try
-                {
-                    attempt = await strategy.RepairAsync(
-                        current,
-                        expectation,
-                        cancellationToken).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (JsonRepairLimitException)
-                {
-                    throw;
-                }
-                catch (Exception exception)
-                {
-                    nodeReports.Add(new StrategyReport(
-                        strategy.Name,
-                        StrategyStatus.Failed,
-                        Note: exception.Message));
-                    continue;
-                }
-
-                var report = ReportNodeAttempt(
-                    strategy.Name,
-                    attempt,
-                    current);
-                nodeReports.Add(report);
-
-                if (report.Status != StrategyStatus.Succeeded)
-                {
-                    continue;
-                }
-
-                correctionCount += CountNodeCorrections(
-                    current,
-                    attempt.Repaired!,
-                    _limits.MaxCorrections - correctionCount);
-                if (correctionCount > _limits.MaxCorrections)
-                {
-                    throw new JsonRepairLimitException(
-                        $"Repair exceeded the maximum of {_limits.MaxCorrections} corrections.");
-                }
-
-                current = attempt.Repaired!;
-                nodeWasRepaired = true;
-            }
-        }
+        var nodePhase = expectation is null
+            ? new NodePhaseResult(root, [], WasRepaired: false)
+            : await RunNodePhaseAsync(
+                root,
+                expectation,
+                tolerantParse?.CorrectionCount ?? 0,
+                cancellationToken).ConfigureAwait(false);
+        var nodeReports = nodePhase.Reports;
+        var current = nodePhase.Current;
+        var nodeWasRepaired = nodePhase.WasRepaired;
 
         var wasRepaired =
             textWasRepaired ||
@@ -643,6 +559,64 @@ public sealed class JsonRepairPipeline
             tolerantParse,
             shapeStatus,
             shapeErrors);
+    }
+
+    private async ValueTask<NodePhaseResult> RunNodePhaseAsync(
+        JsonNode current,
+        JsonSchemaExpectation expectation,
+        int correctionCount,
+        CancellationToken cancellationToken)
+    {
+        var reports = new List<StrategyReport>();
+        var wasRepaired = false;
+        foreach (var strategy in _nodeRepairs)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            NodeRepairAttempt attempt;
+            try
+            {
+                attempt = await strategy.RepairAsync(
+                    current,
+                    expectation,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (JsonRepairLimitException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                reports.Add(new StrategyReport(
+                    strategy.Name,
+                    StrategyStatus.Failed,
+                    Note: exception.Message));
+                continue;
+            }
+
+            var report = ReportNodeAttempt(strategy.Name, attempt, current);
+            reports.Add(report);
+            if (report.Status != StrategyStatus.Succeeded)
+                continue;
+
+            correctionCount += CountNodeCorrections(
+                current,
+                attempt.Repaired!,
+                _limits.MaxCorrections - correctionCount);
+            if (correctionCount > _limits.MaxCorrections)
+            {
+                throw new JsonRepairLimitException(
+                    $"Repair exceeded the maximum of {_limits.MaxCorrections} corrections.");
+            }
+
+            current = attempt.Repaired!;
+            wasRepaired = true;
+        }
+
+        return new NodePhaseResult(current, reports, wasRepaired);
     }
 
     private void EnsureOutputWithinLimit(string output)
@@ -967,4 +941,14 @@ public sealed class JsonRepairPipeline
     private readonly record struct RepairResult(
         TextRepairAttempt Attempt,
         string? Error);
+
+    private readonly record struct TextPhaseResult(
+        string Current,
+        bool WasRepaired,
+        bool Accepted);
+
+    private readonly record struct NodePhaseResult(
+        JsonNode Current,
+        IReadOnlyList<StrategyReport> Reports,
+        bool WasRepaired);
 }

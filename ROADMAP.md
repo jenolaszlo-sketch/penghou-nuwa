@@ -95,11 +95,11 @@ Completed in the first architecture slice:
 - Ordered strategy registration supports types, instances, and factories in
   standalone and dependency-injection construction; reflection remains a
   compatibility fallback.
+- Text and salvage execution share one ordered phase runner; node execution
+  uses a dedicated runner that preserves mutation budgets and causal reports.
 
 ### Parser and strategy construction
 
-- Consolidate duplicated text, salvage, and node phase bookkeeping only when
-  causal reporting and skipped-strategy behavior remain explicit.
 
 ### Schema expectation reuse
 
