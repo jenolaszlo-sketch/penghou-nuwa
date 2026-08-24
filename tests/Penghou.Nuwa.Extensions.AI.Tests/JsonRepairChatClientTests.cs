@@ -238,6 +238,28 @@ public sealed class JsonRepairChatClientTests
     }
 
     [Fact]
+    public async Task GetResponseAsync_CachesResponseSchemaExpectation()
+    {
+        var inner = new FakeChatClient(
+            new ChatResponse(
+                new ChatMessage(
+                    ChatRole.Assistant,
+                    [new TextContent("{\"files\":[\"a.txt\"]}")])));
+        var client = new JsonRepairChatClient(inner);
+
+        await client.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "first")],
+            StructuredFilesResponse,
+            TestContext.Current.CancellationToken);
+        await client.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "second")],
+            StructuredFilesResponse,
+            TestContext.Current.CancellationToken);
+
+        client.CachedExpectationCount.Should().Be(1);
+    }
+
+    [Fact]
     public async Task GetResponseAsync_ScalarProseUnderJsonResponseFormat_IsNotRewritten()
     {
         // Salvage quoting can turn free-form assistant prose into valid JSON

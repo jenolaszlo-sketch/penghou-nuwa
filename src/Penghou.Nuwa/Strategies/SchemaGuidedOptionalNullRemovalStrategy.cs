@@ -22,6 +22,13 @@ public sealed class SchemaGuidedOptionalNullRemovalStrategy
         ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(expectation);
 
+        if (!CanRepair(node, expectation))
+        {
+            return new(new NodeRepairAttempt(
+                RepairOutcome.NotApplicable,
+                null));
+        }
+
         var repaired = node.DeepClone();
         var changed = RepairNode(repaired, expectation);
 
@@ -30,6 +37,39 @@ public sealed class SchemaGuidedOptionalNullRemovalStrategy
                 ? RepairOutcome.Repaired
                 : RepairOutcome.NotApplicable,
             changed ? repaired : null));
+    }
+
+    private static bool CanRepair(
+        JsonNode node,
+        JsonSchemaExpectation expectation)
+    {
+        var effective = expectation.TryResolveBranch(node) ?? expectation;
+        if (node is JsonObject value)
+        {
+            foreach (var property in value)
+            {
+                var child = effective.GetProperty(property.Key);
+                if (child is null)
+                    continue;
+                if (property.Value is null)
+                {
+                    if (!effective.RequiresProperty(property.Key) &&
+                        !child.AllowsNull)
+                        return true;
+                }
+                else if (CanRepair(property.Value, child))
+                {
+                    return true;
+                }
+            }
+        }
+        else if (node is JsonArray array &&
+                 effective.GetItem() is { } item)
+        {
+            return array.Any(value => value is not null && CanRepair(value, item));
+        }
+
+        return false;
     }
 
     private static bool RepairNode(

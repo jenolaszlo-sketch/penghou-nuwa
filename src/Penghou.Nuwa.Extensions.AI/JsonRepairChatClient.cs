@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 
@@ -32,6 +33,10 @@ public class JsonRepairChatClient : DelegatingChatClient
 {
     private readonly JsonRepairChatClientOptions _options;
     private readonly IJsonRepairPipeline _pipeline;
+    private readonly ConcurrentDictionary<string, JsonSchemaExpectation>
+        _expectationCache = new(StringComparer.Ordinal);
+
+    internal int CachedExpectationCount => _expectationCache.Count;
 
     /// <summary>
     /// Creates a client that wraps <paramref name="innerClient"/> and repairs
@@ -372,7 +377,7 @@ public class JsonRepairChatClient : DelegatingChatClient
                 cancellationToken)
             : ValueTask.CompletedTask;
 
-    private static JsonSchemaExpectation? ResolveFunctionCallExpectation(
+    private JsonSchemaExpectation? ResolveFunctionCallExpectation(
         ChatOptions? options,
         string? functionName)
     {
@@ -392,7 +397,7 @@ public class JsonRepairChatClient : DelegatingChatClient
                 declaration.JsonSchema.ValueKind ==
                 JsonValueKind.Object)
             {
-                return JsonSchemaExpectation.FromSchemaJson(
+                return ResolveCachedExpectation(
                     declaration.JsonSchema.GetRawText());
             }
         }
@@ -400,17 +405,27 @@ public class JsonRepairChatClient : DelegatingChatClient
         return null;
     }
 
-    private static JsonSchemaExpectation? ResolveResponseFormatExpectation(
+    private JsonSchemaExpectation? ResolveResponseFormatExpectation(
         ChatOptions? options)
     {
         if (options?.ResponseFormat is ChatResponseFormatJson json &&
             json.Schema is { } schema &&
             schema.ValueKind == JsonValueKind.Object)
         {
-            return JsonSchemaExpectation.FromSchemaJson(
-                schema.GetRawText());
+            return ResolveCachedExpectation(schema.GetRawText());
         }
 
         return null;
+    }
+
+    private JsonSchemaExpectation? ResolveCachedExpectation(string schema)
+    {
+        if (_expectationCache.TryGetValue(schema, out var cached))
+            return cached;
+
+        var created = JsonSchemaExpectation.FromSchemaJson(schema);
+        if (created is not null)
+            _expectationCache.TryAdd(schema, created);
+        return created;
     }
 }

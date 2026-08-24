@@ -90,6 +90,8 @@ Completed in the first architecture slice:
 - Trusted internal result construction avoids redundant consistency reparsing.
 - Unchanged node-strategy output no longer receives causal success credit.
 - Failure output is subject to the same output limit as successful repair.
+- AI response/tool schemas are cached per wrapped client by schema identity.
+- Optional-null removal performs a dry applicability scan before cloning.
 
 ### Parser and strategy construction
 
@@ -103,16 +105,14 @@ Completed in the first architecture slice:
 
 - Define cache ownership and mutation semantics first because `Schema` is
   currently publicly reachable as a mutable `JsonNode`.
-- Cache AI tool expectations by tool identity and schema identity where the
-  connector exposes stable references.
 
 ### Parsing and allocation performance
 
 - Replace repeated string reconstruction in template/verbatim strategies with
   bounded single-pass builders where benchmarks show value.
 - Reuse parse results inside salvage strategies.
-- Avoid full-tree clones for node strategies that can determine
-  `NotApplicable` with a dry run.
+- Extend dry applicability scans to other node strategies where the extra
+  traversal is cheaper than routinely cloning unchanged payloads.
 - Add adversarial benchmarks before and after each hot-path optimization.
 
 ### Unified limits and causality
