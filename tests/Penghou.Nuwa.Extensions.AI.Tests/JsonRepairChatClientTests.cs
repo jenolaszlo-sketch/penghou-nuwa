@@ -150,6 +150,94 @@ public sealed class JsonRepairChatClientTests
     }
 
     [Fact]
+    public async Task GetResponseAsync_RepairsJsonLookingTextWhenExplicitlyEnabled()
+    {
+        const string malformed = "{\"files\":[\"a.txt\" ";
+        var inner = new FakeChatClient(
+            new ChatResponse(
+                new ChatMessage(
+                    ChatRole.Assistant,
+                    [new TextContent(malformed)])));
+        var client = inner.UseJsonRepair(
+            new JsonRepairChatClientOptions
+            {
+                RepairJsonLookingTextWithoutResponseFormat = true
+            });
+
+        var response = await client.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "show JSON")],
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        var repaired = response.Messages[0].Contents[0]
+            .Should().BeOfType<TextContent>().Which.Text;
+        using var document = JsonDocument.Parse(repaired);
+        document.RootElement.GetProperty("files").GetArrayLength().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_UsesFunctionCallExpectationResolver()
+    {
+        var invoked = false;
+        var fcc = new FunctionCallContent(
+            "call_1",
+            "custom",
+            new Dictionary<string, object?> { ["files"] = "[\"a.txt\"]" });
+        var inner = new FakeChatClient(
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, [fcc])));
+        var client = inner.UseJsonRepair(
+            new JsonRepairChatClientOptions
+            {
+                FunctionCallExpectationResolver = _ =>
+                {
+                    invoked = true;
+                    return JsonSchemaExpectation.FromSchemaJson(
+                        """{"type":"object","properties":{"files":{"type":"array","items":{"type":"string"}}}}""");
+                }
+            });
+
+        var response = await client.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "apply")],
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        invoked.Should().BeTrue();
+        var repaired = response.Messages[0].Contents[0]
+            .Should().BeOfType<FunctionCallContent>().Which;
+        ((JsonElement)repaired.Arguments!["files"]!).ValueKind
+            .Should().Be(JsonValueKind.Array);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_UsesTextExpectationResolver()
+    {
+        var invoked = false;
+        var inner = new FakeChatClient(
+            new ChatResponse(
+                new ChatMessage(
+                    ChatRole.Assistant,
+                    [new TextContent("{\"files\":[\"a.txt\" ")])));
+        var client = inner.UseJsonRepair(
+            new JsonRepairChatClientOptions
+            {
+                TextExpectationResolver = _ =>
+                {
+                    invoked = true;
+                    return JsonSchemaExpectation.FromSchemaJson(
+                        """{"type":"object","required":["files"],"properties":{"files":{"type":"array","items":{"type":"string"}}}}""");
+                }
+            });
+
+        var response = await client.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "list")],
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        invoked.Should().BeTrue();
+        var repaired = response.Messages[0].Contents[0]
+            .Should().BeOfType<TextContent>().Which.Text;
+        using var document = JsonDocument.Parse(repaired);
+        document.RootElement.GetProperty("files").GetArrayLength().Should().Be(1);
+    }
+
+    [Fact]
     public async Task GetResponseAsync_ScalarProseUnderJsonResponseFormat_IsNotRewritten()
     {
         // Salvage quoting can turn free-form assistant prose into valid JSON

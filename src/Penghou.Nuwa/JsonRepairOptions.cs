@@ -91,6 +91,18 @@ public sealed class JsonRepairOptions
         return this;
     }
 
+    public JsonRepairOptions InsertSalvageRepairAfter<TAnchor, TNew>()
+        where TAnchor : class, ITextRepair
+        where TNew : class, ITextRepair
+    {
+        InsertAfter(
+            _salvageRepairs,
+            typeof(TAnchor),
+            typeof(TNew),
+            "salvage repair");
+        return this;
+    }
+
     public JsonRepairOptions RemoveSalvageRepair<T>() where T : class, ITextRepair
     {
         Remove(_salvageRepairs, typeof(T), "salvage repair");

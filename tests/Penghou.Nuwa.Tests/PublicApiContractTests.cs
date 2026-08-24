@@ -51,6 +51,7 @@ public sealed class PublicApiContractTests
           method Penghou.Nuwa.JsonRepairOptions EnableSchemaCoercions()
           method Penghou.Nuwa.JsonRepairOptions EnableStructuralPropertyReconciliation()
           method Penghou.Nuwa.JsonRepairOptions InsertNodeRepairAfter<TAnchor, TNew>()
+          method Penghou.Nuwa.JsonRepairOptions InsertSalvageRepairAfter<TAnchor, TNew>()
           method Penghou.Nuwa.JsonRepairOptions InsertTextRepairAfter<TAnchor, TNew>()
           method Penghou.Nuwa.JsonRepairOptions RemoveNodeRepair<T>()
           method Penghou.Nuwa.JsonRepairOptions RemoveSalvageRepair<T>()

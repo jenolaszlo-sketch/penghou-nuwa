@@ -118,7 +118,7 @@ public sealed class JsonRepairPipeline
         var result = await RepairCoreAsync(
             input,
             expectation,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
         stopwatch.Stop();
 
         LogOutcome(
@@ -350,7 +350,7 @@ public sealed class JsonRepairPipeline
                 textWasRepaired: false,
                 originalText: input,
                 tolerantParse: null,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
         }
 
         // Ordered text-repair phase.
@@ -363,7 +363,7 @@ public sealed class JsonRepairPipeline
             var repair = await TryRepairAsync(
                 strategy,
                 current,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
 
             if (repair.Error is not null)
             {
@@ -416,7 +416,7 @@ public sealed class JsonRepairPipeline
                 textWasRepaired,
                 originalText: input,
                 tolerantParse: null,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
         }
 
         // Tolerant recovery, then the ordered salvage fallback phase.
@@ -439,7 +439,7 @@ public sealed class JsonRepairPipeline
                 var repair = await TryRepairAsync(
                     strategy,
                     current,
-                    cancellationToken);
+                    cancellationToken).ConfigureAwait(false);
 
                 if (repair.Error is not null)
                 {
@@ -520,7 +520,7 @@ public sealed class JsonRepairPipeline
             textWasRepaired: true,
             originalText: input,
             tolerantParse,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask<JsonRepairResult> CreateResultAsync(
@@ -548,7 +548,7 @@ public sealed class JsonRepairPipeline
                     attempt = await strategy.RepairAsync(
                         current,
                         expectation,
-                        cancellationToken);
+                        cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -688,24 +688,30 @@ public sealed class JsonRepairPipeline
     {
         if (!result.Succeeded)
         {
-            _logger.LogWarning(
-                "Malformed JSON could not be repaired in {ElapsedMilliseconds} ms. Text repairs: {TextRepairs}.",
-                elapsedMilliseconds,
-                Summarize(result.TextRepairs));
+            if (_logger.IsEnabled(LogLevel.Warning))
+            {
+                _logger.LogWarning(
+                    "Malformed JSON could not be repaired in {ElapsedMilliseconds} ms. Text repairs: {TextRepairs}.",
+                    elapsedMilliseconds,
+                    Summarize(result.TextRepairs));
+            }
             return;
         }
 
         if (result.WasRepaired)
         {
-            _logger.LogWarning(
-                "Malformed JSON was repaired in {ElapsedMilliseconds} ms. Winner: {Winner}. Shape status: {ShapeStatus}. Text repairs: {TextRepairs}.",
-                elapsedMilliseconds,
-                result.SucceededBy?.Name ??
-                    "tolerant-recovery",
-                result.ShapeStatus,
-                Summarize(result.TextRepairs));
+            if (_logger.IsEnabled(LogLevel.Warning))
+            {
+                _logger.LogWarning(
+                    "Malformed JSON was repaired in {ElapsedMilliseconds} ms. Winner: {Winner}. Shape status: {ShapeStatus}. Text repairs: {TextRepairs}.",
+                    elapsedMilliseconds,
+                    result.SucceededBy?.Name ??
+                        "tolerant-recovery",
+                    result.ShapeStatus,
+                    Summarize(result.TextRepairs));
+            }
         }
-        else
+        else if (_logger.IsEnabled(LogLevel.Debug))
         {
             _logger.LogDebug(
                 "JSON parsed without repair in {ElapsedMilliseconds} ms.",
@@ -795,7 +801,7 @@ public sealed class JsonRepairPipeline
             return new RepairResult(
                 await strategy.RepairAsync(
                     input,
-                    cancellationToken),
+                    cancellationToken).ConfigureAwait(false),
                 Error: null);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

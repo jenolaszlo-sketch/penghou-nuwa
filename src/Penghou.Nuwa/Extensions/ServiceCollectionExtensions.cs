@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Penghou.Nuwa.Strategies;
 
 namespace Penghou.Nuwa.Extensions;
@@ -53,8 +54,8 @@ public static class ServiceCollectionExtensions
                     textRepairs,
                     salvageRepairs,
                     nodeRepairs,
-                    serviceProvider.GetRequiredService<
-                        ILogger<JsonRepairPipeline>>(),
+                    serviceProvider.GetService<ILogger<JsonRepairPipeline>>() ??
+                        NullLogger<JsonRepairPipeline>.Instance,
                     options.Limits);
             });
 

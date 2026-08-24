@@ -143,6 +143,20 @@ public sealed class MarkdownJsonFenceRepairStrategyTests
     }
 
     [Theory]
+    [InlineData("```json\r\n{\"value\":true}\r\n```\r\nTrailing prose.")]
+    [InlineData("~~~json\n{\"value\":true}\n~~~~~\nTrailing prose.")]
+    [InlineData("```json\n{\"marker\":\"```\"}\n```\nTrailing prose.")]
+    public void RepairAsync_StopsAtFirstValidClosingFenceLine(string input)
+    {
+        var attempt = Repair(_strategy, input);
+
+        attempt.Outcome.Should().Be(RepairOutcome.Repaired);
+        attempt.Repaired.Should().NotContain("Trailing prose");
+        using var document = ParseStrict(attempt.Repaired!);
+        document.RootElement.ValueKind.Should().Be(JsonValueKind.Object);
+    }
+
+    [Theory]
     [InlineData(
         """
         {

@@ -34,6 +34,19 @@ public sealed class JsonRepairPipelineIntegrationTests
     }
 
     [Fact]
+    public void AddJsonRepair_ResolvesWithoutLoggingRegistration()
+    {
+        var services = new ServiceCollection();
+        services.AddJsonRepair();
+
+        using var provider = services.BuildServiceProvider();
+        var pipeline = provider.GetRequiredService<IJsonRepairPipeline>();
+
+        using var result = Repair(pipeline, """{"value":true}""");
+        result.Succeeded.Should().BeTrue();
+    }
+
+    [Fact]
     public void Repair_RecoversBacktickPseudoToolCall()
     {
         var pipeline = CreateDefaultPipeline();

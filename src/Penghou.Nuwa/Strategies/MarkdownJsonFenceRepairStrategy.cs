@@ -197,43 +197,37 @@ public sealed class MarkdownJsonFenceRepairStrategy
     {
         closingFenceStart = 0;
 
-        var contentEnd = TrimWhitespaceEnd(
-            input,
-            bodyStart,
-            input.Length);
-
-        if (contentEnd <= bodyStart)
+        var lineStart = bodyStart;
+        while (lineStart < input.Length)
         {
-            return false;
-        }
-
-        var lineStart = FindLineStart(
-            input,
-            bodyStart,
-            contentEnd);
-
-        var fenceStart = SkipHorizontalWhitespace(
-            input,
-            lineStart,
-            contentEnd);
-
-        var fenceEnd = TrimHorizontalWhitespaceEnd(
-            input,
-            fenceStart,
-            contentEnd);
-
-        if (!IsClosingFence(
+            var lineEnd = FindLineEnd(input, lineStart);
+            var fenceStart = SkipHorizontalWhitespace(
+                input,
+                lineStart,
+                lineEnd);
+            var fenceEnd = TrimHorizontalWhitespaceEnd(
                 input,
                 fenceStart,
-                fenceEnd,
-                marker,
-                minimumFenceLength))
-        {
-            return false;
+                lineEnd);
+
+            if (IsClosingFence(
+                    input,
+                    fenceStart,
+                    fenceEnd,
+                    marker,
+                    minimumFenceLength))
+            {
+                closingFenceStart = lineStart;
+                return true;
+            }
+
+            if (lineEnd == input.Length)
+                break;
+
+            lineStart = SkipLineEnding(input, lineEnd);
         }
 
-        closingFenceStart = lineStart;
-        return true;
+        return false;
     }
 
     private static bool IsClosingFence(
@@ -372,28 +366,6 @@ public sealed class MarkdownJsonFenceRepairStrategy
             input[index] == '\n')
         {
             index++;
-        }
-
-        return index;
-    }
-
-    private static int FindLineStart(
-        string input,
-        int minimum,
-        int end)
-    {
-        var index = end;
-
-        while (index > minimum)
-        {
-            var previous = input[index - 1];
-
-            if (previous is '\r' or '\n')
-            {
-                break;
-            }
-
-            index--;
         }
 
         return index;

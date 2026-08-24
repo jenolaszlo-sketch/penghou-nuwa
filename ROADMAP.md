@@ -39,10 +39,9 @@ its scope.
 - Bounded diagnostic evidence and a larger confidence penalty for broader
   structural inference.
 
-## Next milestone — usability and operational polish
+## Completed milestone — usability and operational polish
 
-These changes are intended to be small, compatible, and independently
-reviewable.
+Completed as a compatible, independently reviewable milestone.
 
 ### Dependency injection
 

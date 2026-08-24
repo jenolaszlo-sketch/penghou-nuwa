@@ -147,6 +147,18 @@ public sealed class JsonRepairOptionsTests
     }
 
     [Fact]
+    public void InsertSalvageRepairAfter_PlacesStrategyAfterAnchor()
+    {
+        var options = new JsonRepairOptions();
+
+        options.InsertSalvageRepairAfter<SalvageRepairStrategy, NoopTextRepair>();
+
+        options.SalvageRepairs.Should().Equal(
+            typeof(SalvageRepairStrategy),
+            typeof(NoopTextRepair));
+    }
+
+    [Fact]
     public void NodeRepairs_FluentMutationsFollowOrder()
     {
         var options = new JsonRepairOptions();
