@@ -134,13 +134,16 @@ public sealed class JsonRepairResult
         ShapeStatus = shapeStatus;
         ShapeErrors = shapeErrors.ToArray();
         TolerantRecovery = tolerantParse?.ToPublicReport();
-        SucceededBy =
-            nodeRepairs.LastOrDefault(
-                report =>
-                    report.Status == StrategyStatus.Succeeded) ??
-            textRepairs.LastOrDefault(
-                report =>
-                    report.Status == StrategyStatus.Succeeded);
+        IsRepairAccepted = document is not null &&
+            shapeStatus != JsonRepairShapeStatus.Mismatched;
+        SucceededBy = IsRepairAccepted
+            ? nodeRepairs.LastOrDefault(
+                    report =>
+                        report.Status == StrategyStatus.Succeeded) ??
+                textRepairs.LastOrDefault(
+                    report =>
+                        report.Status == StrategyStatus.Succeeded)
+            : null;
         Confidence = ComputeConfidence(
             succeeded: Document is not null,
             wasRepaired,
@@ -311,6 +314,13 @@ public sealed class JsonRepairResult
     public string? RepairedText { get; }
 
     public bool Succeeded => Document is not null;
+
+    /// <summary>
+    /// Whether a valid JSON document exists and, when an expectation was
+    /// supplied, its structural shape matches that expectation. Hosts must
+    /// still perform authoritative schema validation and typed mapping.
+    /// </summary>
+    public bool IsRepairAccepted { get; }
 
     public bool WasRepaired { get; }
 

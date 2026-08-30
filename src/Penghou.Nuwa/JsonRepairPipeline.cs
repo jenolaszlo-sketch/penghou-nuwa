@@ -401,35 +401,100 @@ public sealed class JsonRepairPipeline
                 cancellationToken).ConfigureAwait(false);
         }
 
-        // Tolerant recovery, then the ordered salvage fallback phase.
-        var tolerantParse =
-            _tolerantParser.Parse(
+        // Text strategies are speculative until a parser accepts their
+        // output. Keep the original input as an independent recovery path so
+        // a lossy extraction cannot prevent tolerant recovery of better data.
+        var candidateRecovery = ParseTolerantly(
+            current,
+            expectation,
+            cancellationToken);
+        var originalRecovery = string.Equals(
                 current,
+                input,
+                StringComparison.Ordinal)
+            ? null
+            : ParseTolerantly(
+                input,
                 expectation,
-                _limits,
-                cancellationToken,
-                _allowTruncationSalvage);
+                cancellationToken);
+        var selectedRecovery = SelectRecovery(
+            current,
+            candidateRecovery,
+            input,
+            originalRecovery,
+            expectation);
+        var tolerantParse = selectedRecovery.Parse;
+        current = selectedRecovery.Text;
+
+        if (tolerantParse.Root is not null &&
+            selectedRecovery.UsesSpeculativeCandidate)
+        {
+            PromoteCandidateReports(
+                textReports,
+                textPhase.CandidateReportIndexes);
+        }
 
         if (tolerantParse.Root is null)
         {
+            var salvageReports = new List<StrategyReport>();
             var salvagePhase = await RunTextPhaseAsync(
                 _salvageRepairs,
                 current,
-                textReports,
+                salvageReports,
                 candidate =>
                 {
-                    tolerantParse =
-                        _tolerantParser.Parse(
+                    tolerantParse = ParseTolerantly(
                         candidate,
                         expectation,
-                        _limits,
-                        cancellationToken,
-                        _allowTruncationSalvage);
+                        cancellationToken);
                     return tolerantParse.Root is not null;
                 },
                 cancellationToken).ConfigureAwait(false);
             current = salvagePhase.Current;
-            textWasRepaired |= salvagePhase.WasRepaired;
+            var salvageUsedSpeculativeCandidate =
+                selectedRecovery.UsesSpeculativeCandidate;
+
+            if (tolerantParse.Root is null &&
+                !string.Equals(current, input, StringComparison.Ordinal))
+            {
+                var originalSalvageReports = new List<StrategyReport>();
+                TolerantJsonSyntaxTreeParseResult? originalSalvageParse = null;
+                var originalSalvagePhase = await RunTextPhaseAsync(
+                    _salvageRepairs,
+                    input,
+                    originalSalvageReports,
+                    candidate =>
+                    {
+                        originalSalvageParse = ParseTolerantly(
+                            candidate,
+                            expectation,
+                            cancellationToken);
+                        return originalSalvageParse.Root is not null;
+                    },
+                    cancellationToken).ConfigureAwait(false);
+
+                if (originalSalvageParse?.Root is not null)
+                {
+                    current = originalSalvagePhase.Current;
+                    tolerantParse = originalSalvageParse;
+                    salvagePhase = originalSalvagePhase;
+                    salvageReports = originalSalvageReports;
+                    salvageUsedSpeculativeCandidate = false;
+                }
+            }
+
+            if (salvageUsedSpeculativeCandidate &&
+                tolerantParse.Root is not null)
+            {
+                PromoteCandidateReports(
+                    textReports,
+                    textPhase.CandidateReportIndexes);
+            }
+
+            textWasRepaired =
+                salvageUsedSpeculativeCandidate && textPhase.WasRepaired ||
+                salvagePhase.WasRepaired;
+            textReports.AddRange(salvageReports);
         }
         else
         {
@@ -466,11 +531,12 @@ public sealed class JsonRepairPipeline
     private static async ValueTask<TextPhaseResult> RunTextPhaseAsync(
         IReadOnlyList<ITextRepair> strategies,
         string current,
-        ICollection<StrategyReport> reports,
+        List<StrategyReport> reports,
         Func<string, bool> accept,
         CancellationToken cancellationToken)
     {
         var wasRepaired = false;
+        var candidateReportIndexes = new List<int>();
         for (var index = 0; index < strategies.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -491,14 +557,30 @@ public sealed class JsonRepairPipeline
 
             var attempt = repair.Attempt;
             var report = ReportTextAttempt(strategy.Name, attempt, current);
-            reports.Add(report);
             if (report.Status != StrategyStatus.Succeeded)
+            {
+                reports.Add(report);
                 continue;
+            }
 
             current = attempt.Repaired!;
             wasRepaired = true;
+            var reportIndex = reports.Count;
+            candidateReportIndexes.Add(reportIndex);
             if (!accept(current))
+            {
+                reports.Add(report with
+                {
+                    Status = StrategyStatus.Failed,
+                    Note = CombineNotes(
+                        report.Note,
+                        "Produced a speculative candidate that was not accepted by this phase.")
+                });
                 continue;
+            }
+
+            reports.Add(report);
+            PromoteCandidateReports(reports, candidateReportIndexes);
 
             for (var skipped = index + 1; skipped < strategies.Count; skipped++)
             {
@@ -507,11 +589,95 @@ public sealed class JsonRepairPipeline
                     StrategyStatus.Skipped));
             }
 
-            return new TextPhaseResult(current, wasRepaired, Accepted: true);
+            return new TextPhaseResult(
+                current,
+                wasRepaired,
+                Accepted: true,
+                candidateReportIndexes);
         }
 
-        return new TextPhaseResult(current, wasRepaired, Accepted: false);
+        return new TextPhaseResult(
+            current,
+            wasRepaired,
+            Accepted: false,
+            candidateReportIndexes);
     }
+
+    private TolerantJsonSyntaxTreeParseResult ParseTolerantly(
+        string candidate,
+        JsonSchemaExpectation? expectation,
+        CancellationToken cancellationToken) =>
+        _tolerantParser.Parse(
+            candidate,
+            expectation,
+            _limits,
+            cancellationToken,
+            _allowTruncationSalvage);
+
+    private static RecoveryCandidate SelectRecovery(
+        string candidateText,
+        TolerantJsonSyntaxTreeParseResult candidate,
+        string originalText,
+        TolerantJsonSyntaxTreeParseResult? original,
+        JsonSchemaExpectation? expectation)
+    {
+        var candidates = new List<RecoveryCandidate>
+        {
+            new(candidateText, candidate, UsesSpeculativeCandidate: true)
+        };
+        if (original is not null)
+        {
+            candidates.Add(new(
+                originalText,
+                original,
+                UsesSpeculativeCandidate: false));
+        }
+
+        return candidates
+            .OrderBy(item => item.Parse.Root is null ? 1 : 0)
+            .ThenBy(item => ShapeMismatchCount(item.Parse.Root, expectation))
+            .ThenBy(item => item.Parse.CorrectionCount)
+            .ThenBy(item => item.UsesSpeculativeCandidate ? 0 : 1)
+            .First();
+    }
+
+    private static int ShapeMismatchCount(
+        JsonNode? root,
+        JsonSchemaExpectation? expectation) =>
+        root is null
+            ? int.MaxValue
+            : expectation?.ValidateShape(root).Count ?? 0;
+
+    private static void PromoteCandidateReports(
+        IList<StrategyReport> reports,
+        IReadOnlyList<int> indexes)
+    {
+        foreach (var index in indexes)
+        {
+            var report = reports[index];
+            reports[index] = report with
+            {
+                Status = StrategyStatus.Succeeded,
+                Note = RemoveSpeculativeNote(report.Note)
+            };
+        }
+    }
+
+    private static string? RemoveSpeculativeNote(string? note)
+    {
+        const string speculative =
+            "Produced a speculative candidate that was not accepted by this phase.";
+        if (note == speculative)
+            return null;
+        if (note?.EndsWith(" " + speculative, StringComparison.Ordinal) == true)
+            return note[..^(speculative.Length + 1)];
+        return note;
+    }
+
+    private static string CombineNotes(string? first, string second) =>
+        string.IsNullOrWhiteSpace(first)
+            ? second
+            : $"{first} {second}";
 
     private async ValueTask<JsonRepairResult> CreateResultAsync(
         JsonNode root,
@@ -568,7 +734,11 @@ public sealed class JsonRepairPipeline
         CancellationToken cancellationToken)
     {
         var reports = new List<StrategyReport>();
-        var wasRepaired = false;
+        var original = current;
+        var originalShapeErrors = expectation.ValidateShape(original).Count;
+        var candidateReportIndexes = new List<int>();
+        var candidates = new List<NodeCandidate>();
+        var speculativeCorrectionCount = correctionCount;
         foreach (var strategy in _nodeRepairs)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -598,25 +768,60 @@ public sealed class JsonRepairPipeline
             }
 
             var report = ReportNodeAttempt(strategy.Name, attempt, current);
-            reports.Add(report);
             if (report.Status != StrategyStatus.Succeeded)
+            {
+                reports.Add(report);
                 continue;
+            }
 
-            correctionCount += CountNodeCorrections(
+            speculativeCorrectionCount += CountNodeCorrections(
                 current,
                 attempt.Repaired!,
-                _limits.MaxCorrections - correctionCount);
-            if (correctionCount > _limits.MaxCorrections)
+                _limits.MaxCorrections - speculativeCorrectionCount);
+            if (speculativeCorrectionCount > _limits.MaxCorrections)
             {
                 throw new JsonRepairLimitException(
                     $"Repair exceeded the maximum of {_limits.MaxCorrections} corrections.");
             }
 
+            var reportIndex = reports.Count;
+            candidateReportIndexes.Add(reportIndex);
+            reports.Add(report with
+            {
+                Status = StrategyStatus.Failed,
+                Note = CombineNotes(
+                    report.Note,
+                    "Produced a speculative candidate that was not accepted by this phase.")
+            });
             current = attempt.Repaired!;
-            wasRepaired = true;
+            candidates.Add(new NodeCandidate(
+                current,
+                expectation.ValidateShape(current).Count,
+                speculativeCorrectionCount,
+                candidateReportIndexes.ToArray()));
         }
 
-        return new NodePhaseResult(current, reports, wasRepaired);
+        var accepted = candidates
+            .Where(candidate =>
+                candidate.ShapeErrorCount <= originalShapeErrors)
+            .OrderBy(candidate => candidate.ShapeErrorCount)
+            .ThenBy(candidate => candidate.CorrectionCount)
+            .ThenByDescending(candidate => candidate.ReportIndexes.Count)
+            .FirstOrDefault();
+
+        if (accepted is null)
+        {
+            return new NodePhaseResult(
+                original,
+                reports,
+                WasRepaired: false);
+        }
+
+        PromoteCandidateReports(reports, accepted.ReportIndexes);
+        return new NodePhaseResult(
+            accepted.Root,
+            reports,
+            WasRepaired: true);
     }
 
     private void EnsureOutputWithinLimit(string output)
@@ -702,7 +907,18 @@ public sealed class JsonRepairPipeline
             return;
         }
 
-        if (result.WasRepaired)
+        if (result.WasRepaired && !result.IsRepairAccepted)
+        {
+            if (_logger.IsEnabled(LogLevel.Warning))
+            {
+                _logger.LogWarning(
+                    "JSON syntax was recovered in {ElapsedMilliseconds} ms, but the result did not match the expected shape. Shape errors: {ShapeErrors}. Text repairs: {TextRepairs}.",
+                    elapsedMilliseconds,
+                    result.ShapeErrors,
+                    Summarize(result.TextRepairs));
+            }
+        }
+        else if (result.WasRepaired)
         {
             if (_logger.IsEnabled(LogLevel.Warning))
             {
@@ -945,10 +1161,22 @@ public sealed class JsonRepairPipeline
     private readonly record struct TextPhaseResult(
         string Current,
         bool WasRepaired,
-        bool Accepted);
+        bool Accepted,
+        IReadOnlyList<int> CandidateReportIndexes);
+
+    private readonly record struct RecoveryCandidate(
+        string Text,
+        TolerantJsonSyntaxTreeParseResult Parse,
+        bool UsesSpeculativeCandidate);
 
     private readonly record struct NodePhaseResult(
         JsonNode Current,
         IReadOnlyList<StrategyReport> Reports,
         bool WasRepaired);
+
+    private sealed record NodeCandidate(
+        JsonNode Root,
+        int ShapeErrorCount,
+        int CorrectionCount,
+        IReadOnlyList<int> ReportIndexes);
 }

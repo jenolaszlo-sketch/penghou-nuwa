@@ -26,7 +26,7 @@ dotnet add package Penghou.Nuwa
 or pin the version explicitly:
 
 ```xml
-<PackageReference Include="Penghou.Nuwa" Version="0.6.0" />
+<PackageReference Include="Penghou.Nuwa" Version="0.6.2" />
 ```
 
 Targets `net8.0`, `net9.0`, and `net10.0`. For Microsoft.Extensions.AI
@@ -104,12 +104,14 @@ var expectation = JsonSchemaExpectation.FromSchemaJson(schemaJson);
 
 using var result = await pipeline.RepairAsync(input, expectation);
 
-if (result.Succeeded)
+if (result.IsRepairAccepted)
 {
     var files = result.GetRootOrThrow()["files"];
-
-    if (result.ShapeStatus == JsonRepairShapeStatus.Mismatched)
-        Console.WriteLine(string.Join(Environment.NewLine, result.ShapeErrors));
+}
+else if (result.Succeeded)
+{
+    // Syntax recovery succeeded, but the expected structural shape did not.
+    Console.WriteLine(string.Join(Environment.NewLine, result.ShapeErrors));
 }
 ```
 
@@ -140,10 +142,41 @@ This is intentionally **not** a JSON Schema dialect converter or validator for
 model-facing output; do not feed a `JsonSchemaExpectation.Schema` back to an
 LLM or use it as the authoritative contract for a remote API.
 
-`Succeeded` means Nuwa recovered syntactically valid JSON. When an expectation
-is supplied, `ShapeStatus` separately reports whether the result matches the
-types and required structural shape used during recovery. Use a dedicated JSON
-Schema validator when authoritative dialect validation is required.
+`Succeeded` means Nuwa recovered syntactically valid JSON.
+`IsRepairAccepted` additionally requires the result to match the types and
+required structural shape Nuwa uses during recovery. It does **not** mean a
+host successfully deserialized a CLR type, mapped a tool call, or passed domain
+validation. Baize and the consuming application must report those later gates
+separately. Use a dedicated JSON Schema validator when authoritative dialect
+validation is required.
+
+Text repair candidates are speculative until parsing accepts their lineage.
+Nuwa preserves the original input as an independent tolerant/salvage path, so
+a lossy extraction cannot hide a better recovery. Multiple concatenated
+top-level objects are refused as ambiguous rather than silently selecting the
+first. Node repairs run as a bounded speculative chain: an intermediate step
+may temporarily increase shape errors, but the chain commits atomically only
+when a selected candidate is no worse than the original. Otherwise every node
+change is rolled back.
+
+The default node chain can therefore repair double-encoded arrays whose item
+types also need deterministic coercion:
+
+```csharp
+using var result = await pipeline.RepairAsync(
+    """{"files":"[1, 2]"}""",
+    JsonSchemaExpectation.FromSchemaJson(
+        """{"type":"object","required":["files"],"properties":{"files":{"type":"array","items":{"type":"string"}}}}"""));
+
+// {"files":["1","2"]}
+// expansion and scalar-to-string both receive Succeeded only after the
+// complete chain reaches the expected shape.
+```
+
+Only JSON numbers and booleans are coerced to strings, using their
+deterministic token spelling. Nulls, objects, arrays, and existing strings are
+never stringified. This establishes Nuwa-level structural compatibility; it
+does not establish that values such as `"1"` are meaningful filenames.
 
 ## New in 0.6: truncation salvage, payload extraction, coercions, confidence, streaming
 
@@ -275,7 +308,7 @@ OpenAI, Ollama, Semantic Kernel, and anything else that exposes an
 has done its work, so you get the fixes without forking provider SDKs.
 
 ```xml
-<PackageReference Include="Penghou.Nuwa.Extensions.AI" Version="0.6.0" />
+<PackageReference Include="Penghou.Nuwa.Extensions.AI" Version="0.6.2" />
 ```
 
 Two things get repaired, transparently:
@@ -407,7 +440,7 @@ foreach (var report in result.TextRepairs)
         (report.Note is null ? "" : $" ({report.Note})"));
 }
 
-var winner = result.SucceededBy;   // strategy that produced the final document, if any
+var winner = result.SucceededBy;   // strategy in an accepted Nuwa repair lineage, if any
 var recovery = result.TolerantRecovery; // token-level corrections, when tolerant parsing ran
 ```
 

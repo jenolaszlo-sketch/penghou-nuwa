@@ -17,6 +17,27 @@ its scope.
 - Consistent single-quote escape handling.
 - Privacy-safe strategy reports and cancellation throughout recovery loops.
 - Guarded AI middleware that does not rewrite ordinary scalar prose as JSON.
+- Speculative text and extraction candidates no longer replace the original
+  recovery path; tolerant parsing ranks both by parse success, structural
+  errors, and correction count, and salvage can fall back to the original.
+- A text strategy receives causal `Succeeded` credit only when its candidate
+  lineage is accepted. Rejected intermediate candidates remain `Failed` with
+  an explicit privacy-safe note.
+- Concatenated top-level structural values are refused as ambiguous rather
+  than silently selecting the first; a sole value followed by stray delimiters
+  or prose remains recoverable.
+- `IsRepairAccepted` distinguishes Nuwa syntax-plus-shape acceptance from
+  syntax-only `Succeeded`; host deserialization and tool mapping remain later
+  acceptance gates.
+- Node-tree mutations form a bounded speculative lineage. Intermediate steps
+  may temporarily increase structural errors, but Nuwa atomically selects a
+  no-worse candidate or rolls the complete lineage back.
+- Default schema-guided scalar-to-string coercion converts only JSON numbers
+  and booleans using deterministic token spelling. Combined with JSON-string
+  expansion, this repairs inputs such as `{"files":"[1, 2]"}` into
+  `{"files":["1","2"]}` without stringifying nulls or composite values.
+- Recovery logging distinguishes accepted repair from syntax recovery whose
+  expected shape remains mismatched.
 
 ### Schema-guided reconciliation and coercion
 
@@ -159,6 +180,26 @@ diagnostic properties.
 
 ## Deferred investigations
 
+- Continue the dogfood malformed-output corpus from Guyabano:
+  - add a minimized golden vector from workflow
+    `01a052e4-6a8c-7542-9ed8-6ddb55ce2ebc`, task `TASK-TODOTESTS`, if a future
+    privacy-controlled capture preserves the original arguments. The current
+    evidence retains only hashes and the unmatched `]` position, so the exact
+    payload cannot be reconstructed;
+  - optionally select among multiple concatenated documents only when exactly
+    one parses and matches the supplied expectation; until then Nuwa safely
+    refuses every multi-document input as ambiguous;
+  - investigate tolerant recovery that produces a valid JSON tree for the
+    wrong tool/stage shape, including empty objects returned for schemas with
+    required domain fields;
+  - cover truncated nested arrays/objects where syntax recovery succeeds but
+    required component relationship collections remain absent;
+  - publish bounded, privacy-safe evidence for the winning candidate and its
+    before/after schema error counts so hosts can explain why repair was
+    accepted or refused;
+  - maintain golden cases for malformed, concatenated, repaired-but-mismatched,
+    and unambiguously repairable payloads observed during real code-generation
+    runs.
 - Duplicate-property recovery policy: retain strict failure or adopt
   deterministic last-wins behavior with an explicit correction record.
 - Full JSON Schema keyword validation. Nuwa currently validates the structural

@@ -73,6 +73,7 @@ public sealed class PublicApiContractTests
           ctor(System.Text.Json.JsonDocument, System.Text.Json.Nodes.JsonNode, System.String, System.String, System.Boolean, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport>, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport>)
           property System.Double Confidence
           property System.Text.Json.JsonDocument Document
+          property System.Boolean IsRepairAccepted
           property System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport> NodeRepairs
           property System.String OriginalText
           property System.String RepairedText
@@ -189,6 +190,10 @@ public sealed class PublicApiContractTests
           property System.String Name
           method System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt> RepairAsync(System.Text.Json.Nodes.JsonNode, Penghou.Nuwa.JsonSchemaExpectation, System.Threading.CancellationToken)
         type Penghou.Nuwa.Strategies.SchemaGuidedRequiredPropertyReconciliationStrategy : sealed class : Penghou.Nuwa.Strategies.INodeRepair
+          ctor()
+          property System.String Name
+          method System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt> RepairAsync(System.Text.Json.Nodes.JsonNode, Penghou.Nuwa.JsonSchemaExpectation, System.Threading.CancellationToken)
+        type Penghou.Nuwa.Strategies.SchemaGuidedScalarToStringCoercionStrategy : sealed class : Penghou.Nuwa.Strategies.INodeRepair
           ctor()
           property System.String Name
           method System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt> RepairAsync(System.Text.Json.Nodes.JsonNode, Penghou.Nuwa.JsonSchemaExpectation, System.Threading.CancellationToken)

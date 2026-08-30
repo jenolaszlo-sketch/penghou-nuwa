@@ -116,18 +116,31 @@ public sealed class EnhancedRepairTests
     }
 
     [Fact]
-    public async Task ConcatenatedObjects_FirstValueWins()
+    public async Task ConcatenatedObjects_AreRefusedAsAmbiguous()
+    {
+        var strategy = new ConcatenatedJsonExtractionStrategy();
+
+        var result = await strategy.RepairAsync(
+            """{"first": 1}{"second": 2}""",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Outcome.Should().Be(RepairOutcome.Failed);
+        result.Repaired.Should().BeNull();
+        result.Note.Should().Contain("ambiguous");
+    }
+
+    [Fact]
+    public async Task ConcatenatedJson_StrayClosingDelimiter_IsRemoved()
     {
         var pipeline = JsonRepairPipeline.Create();
 
         using var result = await pipeline.RepairAsync(
-            """{"first": 1}{"second": 2}""",
+            """{"first": 1}]""",
             cancellationToken: TestContext.Current.CancellationToken);
 
-        result.Succeeded.Should().BeTrue();
-        result.Root!["first"].Should().NotBeNull();
-        result.Root!.AsObject().Should().ContainSingle();
-        result.Confidence.Should().BeLessThan(0.8);
+        result.IsRepairAccepted.Should().BeTrue();
+        result.Root!["first"]!.GetValue<int>().Should().Be(1);
+        result.SucceededBy!.Name.Should().Be("concatenated-json");
     }
 
     [Fact]

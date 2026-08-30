@@ -27,6 +27,7 @@ public sealed class JsonRepairOptions
         _salvageRepairs.Add(typeof(SalvageRepairStrategy));
         _nodeRepairs.Add(typeof(SchemaGuidedOptionalNullRemovalStrategy));
         _nodeRepairs.Add(typeof(SchemaGuidedJsonStringExpansionStrategy));
+        _nodeRepairs.Add(typeof(SchemaGuidedScalarToStringCoercionStrategy));
     }
 
     /// <summary>

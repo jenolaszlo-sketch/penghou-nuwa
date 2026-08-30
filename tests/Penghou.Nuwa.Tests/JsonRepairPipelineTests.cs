@@ -257,6 +257,107 @@ public sealed class JsonRepairPipelineTests
     }
 
     [Fact]
+    public void RepairAsync_SpeculativeCandidateCannotHideRecoverableOriginal()
+    {
+        var applied = new List<string>();
+        var pipeline = new JsonRepairPipeline(
+            [new RecordingStrategy(
+                "lossy-extraction",
+                """{"items":[1,2""",
+                "not json",
+                applied)],
+            [],
+            [],
+            NullLogger<JsonRepairPipeline>.Instance);
+
+        using var result = Repair(
+            pipeline,
+            """{"items":[1,2""");
+
+        result.IsRepairAccepted.Should().BeTrue();
+        result.Root!["items"]!.AsArray().Should().HaveCount(2);
+        result.TextRepairs.Should().ContainSingle().Which.Status
+            .Should().Be(StrategyStatus.Failed);
+        result.SucceededBy.Should().BeNull();
+    }
+
+    [Fact]
+    public void RepairAsync_SalvageAlsoReceivesPreservedOriginal()
+    {
+        var pipeline = new JsonRepairPipeline(
+            [new RecordingStrategy(
+                "lossy-extraction",
+                "source",
+                "bad candidate",
+                [])],
+            [new RecordingStrategy(
+                "original-salvage",
+                "source",
+                """{"ok":true}""",
+                [])],
+            [],
+            NullLogger<JsonRepairPipeline>.Instance);
+
+        using var result = Repair(pipeline, "source");
+
+        result.IsRepairAccepted.Should().BeTrue();
+        result.Root!["ok"]!.GetValue<bool>().Should().BeTrue();
+        result.TextRepairs.Should().Contain(report =>
+            report.Name == "lossy-extraction" &&
+            report.Status == StrategyStatus.Failed);
+        result.TextRepairs.Should().Contain(report =>
+            report.Name == "original-salvage" &&
+            report.Status == StrategyStatus.Succeeded);
+        result.SucceededBy!.Name.Should().Be("original-salvage");
+    }
+
+    [Fact]
+    public void RepairAsync_RecoveredButMismatchedDocument_IsNotUsable()
+    {
+        var logger = new CapturingLogger();
+        var pipeline = new JsonRepairPipeline([], [], [], logger);
+        var expectation = JsonSchemaExpectation.FromSchemaJson(
+            """{"type":"object","required":["items"],"properties":{"items":{"type":"array"}}}""")!;
+
+        using var result = Repair(
+            pipeline,
+            """{"other":true""",
+            expectation);
+
+        result.Succeeded.Should().BeTrue();
+        result.IsRepairAccepted.Should().BeFalse();
+        result.ShapeStatus.Should().Be(JsonRepairShapeStatus.Mismatched);
+        result.SucceededBy.Should().BeNull();
+        logger.Messages.Should().Contain(entry =>
+            entry.Level == LogLevel.Warning &&
+            entry.Message.Contains("did not match the expected shape"));
+    }
+
+    [Fact]
+    public void RepairAsync_RollsBackNodeChainWhenNoLaterStrategyRepairsShape()
+    {
+        var pipeline = new JsonRepairPipeline(
+            [],
+            [],
+            [new SchemaGuidedJsonStringExpansionStrategy()],
+            NullLogger<JsonRepairPipeline>.Instance);
+        var expectation = JsonSchemaExpectation.FromSchemaJson(
+            """{"type":"object","required":["files"],"properties":{"files":{"type":"array","items":{"type":"string"}}}}""")!;
+
+        using var result = Repair(
+            pipeline,
+            """{"files":"[1, 2]"}""",
+            expectation);
+
+        result.IsRepairAccepted.Should().BeFalse();
+        result.WasRepaired.Should().BeFalse();
+        result.Root!["files"]!.GetValue<string>().Should().Be("[1, 2]");
+        result.NodeRepairs.Should().ContainSingle().Which.Status
+            .Should().Be(StrategyStatus.Failed);
+        result.SucceededBy.Should().BeNull();
+    }
+
+    [Fact]
     public async Task RepairAsync_PropagatesCancellationFromStrategy()
     {
         using var cts = new CancellationTokenSource();

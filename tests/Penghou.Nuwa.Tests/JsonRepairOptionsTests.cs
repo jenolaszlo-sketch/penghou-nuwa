@@ -25,7 +25,8 @@ public sealed class JsonRepairOptionsTests
             typeof(SalvageRepairStrategy));
         options.NodeRepairs.Should().Equal(
             typeof(SchemaGuidedOptionalNullRemovalStrategy),
-            typeof(SchemaGuidedJsonStringExpansionStrategy));
+            typeof(SchemaGuidedJsonStringExpansionStrategy),
+            typeof(SchemaGuidedScalarToStringCoercionStrategy));
     }
 
     [Fact]
@@ -173,6 +174,7 @@ public sealed class JsonRepairOptionsTests
             typeof(SchemaGuidedOptionalNullRemovalStrategy),
             typeof(NoopNodeRepair),
             typeof(SchemaGuidedJsonStringExpansionStrategy),
+            typeof(SchemaGuidedScalarToStringCoercionStrategy),
             typeof(NoopNodeRepair));
     }
 

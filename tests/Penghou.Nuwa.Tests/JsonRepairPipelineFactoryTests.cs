@@ -39,7 +39,7 @@ public sealed class JsonRepairPipelineFactoryTests
     }
 
     [Fact]
-    public void Create_DefaultPipeline_RunsSchemaGuidedNodeRepair()
+    public void Create_DefaultPipeline_AtomicallyExpandsAndCoercesArrayItems()
     {
         var pipeline = JsonRepairPipeline.Create();
         var expectation = JsonSchemaExpectation.FromSchemaJson(
@@ -59,12 +59,20 @@ public sealed class JsonRepairPipelineFactoryTests
             expectation);
 
         result.Succeeded.Should().BeTrue();
+        result.IsRepairAccepted.Should().BeTrue();
         result.NodeRepairs.Should().Contain(
             report =>
                 report.Name == "schema-guided-json-string-expansion" &&
                 report.Status == StrategyStatus.Succeeded);
+        result.NodeRepairs.Should().Contain(
+            report =>
+                report.Name == "schema-guided-scalar-to-string" &&
+                report.Status == StrategyStatus.Succeeded);
+        result.Root!["files"]!.AsArray()
+            .Select(item => item!.GetValue<string>())
+            .Should().Equal("1", "2");
         result.SucceededBy!.Name.Should()
-            .Be("schema-guided-json-string-expansion");
+            .Be("schema-guided-scalar-to-string");
     }
 
     [Fact]

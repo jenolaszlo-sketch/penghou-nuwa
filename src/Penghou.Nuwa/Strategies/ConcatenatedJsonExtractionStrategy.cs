@@ -1,11 +1,9 @@
 namespace Penghou.Nuwa.Strategies;
 
 /// <summary>
-/// Handles models that emit more than one top-level JSON value back to back,
-/// e.g. <c>{"a":1}{"b":2}</c> or newline-delimited objects. The first
-/// complete value is kept and the remainder discarded — the right behaviour
-/// for tool arguments and single-response structured output, where the first
-/// object is the answer and later objects are echoes or continuations.
+/// Handles a complete top-level JSON value followed by a stray delimiter or
+/// prose. Inputs containing another structural value are refused as ambiguous
+/// instead of silently choosing the first document.
 /// </summary>
 public sealed class ConcatenatedJsonExtractionStrategy
     : ITextRepair
@@ -28,18 +26,25 @@ public sealed class ConcatenatedJsonExtractionStrategy
                 null));
         }
 
-        var changed = TryExtract(input, out var repaired);
+        var changed = TryExtract(input, out var repaired, out var note);
 
         return new(new TextRepairAttempt(
-            changed ? RepairOutcome.Repaired : RepairOutcome.NotApplicable,
-            changed ? repaired : null));
+            changed
+                ? RepairOutcome.Repaired
+                : note is null
+                    ? RepairOutcome.NotApplicable
+                    : RepairOutcome.Failed,
+            changed ? repaired : null,
+            note));
     }
 
     internal static bool TryExtract(
         string input,
-        out string payload)
+        out string payload,
+        out string? note)
     {
         payload = string.Empty;
+        note = null;
 
         var start = IndexOfFirstStructure(input);
         if (start < 0 ||
@@ -87,8 +92,27 @@ public sealed class ConcatenatedJsonExtractionStrategy
             return false;
         }
 
+        if (ContainsAnotherStructure(input, close + 1))
+        {
+            note = "Multiple top-level structural values were present; selection would be ambiguous.";
+            return false;
+        }
+
         payload = input[..(close + 1)];
         return true;
+    }
+
+    private static bool ContainsAnotherStructure(
+        string input,
+        int start)
+    {
+        for (var index = start; index < input.Length; index++)
+        {
+            if (input[index] is '{' or '[')
+                return true;
+        }
+
+        return false;
     }
 
     private static int IndexOfFirstStructure(string input)
