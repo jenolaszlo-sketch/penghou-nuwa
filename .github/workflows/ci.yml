@@ -22,7 +22,15 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          # Install all targeted SDKs: test projects build native apphosts for
+          # net8.0/net9.0, which requires the matching apphost packs (and the
+          # test matrix needs the matching runtimes). Relying on only the
+          # .NET 10 SDK fails the build with MSB3030 when the downlevel packs
+          # are absent from the runner.
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
 
       - name: Build
         run: dotnet build Penghou.Nuwa.slnx --configuration Release
