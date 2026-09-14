@@ -1,0 +1,58 @@
+#nullable enable
+override Penghou.Nuwa.Extensions.AI.JsonRepairChatClient.GetResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage!>! messages, Microsoft.Extensions.AI.ChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse!>!
+override Penghou.Nuwa.Extensions.AI.JsonRepairChatClient.GetStreamingResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage!>! messages, Microsoft.Extensions.AI.ChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate!>!
+override Penghou.Nuwa.Extensions.AI.JsonRepairNotification.Equals(object? obj) -> bool
+override Penghou.Nuwa.Extensions.AI.JsonRepairNotification.GetHashCode() -> int
+override Penghou.Nuwa.Extensions.AI.JsonRepairNotification.ToString() -> string!
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClient
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClient.JsonRepairChatClient(Microsoft.Extensions.AI.IChatClient! innerClient, Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions! options) -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClient.JsonRepairChatClient(Microsoft.Extensions.AI.IChatClient! innerClient, Penghou.Nuwa.IJsonRepairPipeline! pipeline, Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions? options = null) -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClient.JsonRepairChatClient(Microsoft.Extensions.AI.IChatClient! innerClient, System.Action<Penghou.Nuwa.JsonRepairOptions!>? configure = null) -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientBuilderExtensions
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.Configure.get -> System.Action<Penghou.Nuwa.JsonRepairOptions!>?
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.Configure.set -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.FunctionCallExpectationResolver.get -> System.Func<Microsoft.Extensions.AI.FunctionCallContent!, Penghou.Nuwa.JsonSchemaExpectation?>?
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.FunctionCallExpectationResolver.set -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.JsonRepairChatClientOptions() -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.RepairCompleted.get -> System.Func<Penghou.Nuwa.Extensions.AI.JsonRepairNotification!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>?
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.RepairCompleted.set -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.RepairFunctionCallArguments.get -> bool
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.RepairFunctionCallArguments.set -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.RepairJsonLookingTextWithoutResponseFormat.get -> bool
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.RepairJsonLookingTextWithoutResponseFormat.set -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.RepairResponseText.get -> bool
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.RepairResponseText.set -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.TextExpectationResolver.get -> System.Func<Microsoft.Extensions.AI.ChatOptions?, Penghou.Nuwa.JsonSchemaExpectation?>?
+Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions.TextExpectationResolver.set -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.<Clone>$() -> Penghou.Nuwa.Extensions.AI.JsonRepairNotification!
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.Confidence.get -> double
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.Confidence.init -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.Deconstruct(out string! Target, out bool Succeeded, out bool WasRepaired, out Penghou.Nuwa.JsonRepairShapeStatus ShapeStatus, out System.Collections.Generic.IReadOnlyList<string!>! ShapeErrors, out System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>! TextRepairs, out System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>! NodeRepairs, out Penghou.Nuwa.TolerantRecoveryReport? TolerantRecovery, out double Confidence) -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.Equals(Penghou.Nuwa.Extensions.AI.JsonRepairNotification? other) -> bool
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.JsonRepairNotification(string! Target, bool Succeeded, bool WasRepaired, Penghou.Nuwa.JsonRepairShapeStatus ShapeStatus, System.Collections.Generic.IReadOnlyList<string!>! ShapeErrors, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>! TextRepairs, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>! NodeRepairs, Penghou.Nuwa.TolerantRecoveryReport? TolerantRecovery, double Confidence = 1) -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.NodeRepairs.get -> System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>!
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.NodeRepairs.init -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.ShapeErrors.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.ShapeErrors.init -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.ShapeStatus.get -> Penghou.Nuwa.JsonRepairShapeStatus
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.ShapeStatus.init -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.Succeeded.get -> bool
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.Succeeded.init -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.Target.get -> string!
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.Target.init -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.TextRepairs.get -> System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>!
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.TextRepairs.init -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.TolerantRecovery.get -> Penghou.Nuwa.TolerantRecoveryReport?
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.TolerantRecovery.init -> void
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.WasRepaired.get -> bool
+Penghou.Nuwa.Extensions.AI.JsonRepairNotification.WasRepaired.init -> void
+static Penghou.Nuwa.Extensions.AI.JsonRepairChatClientBuilderExtensions.UseJsonRepair(this Microsoft.Extensions.AI.ChatClientBuilder! builder, Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions! options) -> Microsoft.Extensions.AI.ChatClientBuilder!
+static Penghou.Nuwa.Extensions.AI.JsonRepairChatClientBuilderExtensions.UseJsonRepair(this Microsoft.Extensions.AI.ChatClientBuilder! builder, Penghou.Nuwa.IJsonRepairPipeline! pipeline, Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions? options = null) -> Microsoft.Extensions.AI.ChatClientBuilder!
+static Penghou.Nuwa.Extensions.AI.JsonRepairChatClientBuilderExtensions.UseJsonRepair(this Microsoft.Extensions.AI.ChatClientBuilder! builder, System.Action<Penghou.Nuwa.JsonRepairOptions!>? configure = null) -> Microsoft.Extensions.AI.ChatClientBuilder!
+static Penghou.Nuwa.Extensions.AI.JsonRepairChatClientBuilderExtensions.UseJsonRepair(this Microsoft.Extensions.AI.IChatClient! innerClient, Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions! options) -> Microsoft.Extensions.AI.IChatClient!
+static Penghou.Nuwa.Extensions.AI.JsonRepairChatClientBuilderExtensions.UseJsonRepair(this Microsoft.Extensions.AI.IChatClient! innerClient, Penghou.Nuwa.IJsonRepairPipeline! pipeline, Penghou.Nuwa.Extensions.AI.JsonRepairChatClientOptions? options = null) -> Microsoft.Extensions.AI.IChatClient!
+static Penghou.Nuwa.Extensions.AI.JsonRepairChatClientBuilderExtensions.UseJsonRepair(this Microsoft.Extensions.AI.IChatClient! innerClient, System.Action<Penghou.Nuwa.JsonRepairOptions!>? configure = null) -> Microsoft.Extensions.AI.IChatClient!
+static Penghou.Nuwa.Extensions.AI.JsonRepairNotification.operator !=(Penghou.Nuwa.Extensions.AI.JsonRepairNotification? left, Penghou.Nuwa.Extensions.AI.JsonRepairNotification? right) -> bool
+static Penghou.Nuwa.Extensions.AI.JsonRepairNotification.operator ==(Penghou.Nuwa.Extensions.AI.JsonRepairNotification? left, Penghou.Nuwa.Extensions.AI.JsonRepairNotification? right) -> bool

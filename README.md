@@ -26,7 +26,7 @@ dotnet add package Penghou.Nuwa
 or pin the version explicitly:
 
 ```xml
-<PackageReference Include="Penghou.Nuwa" Version="0.6.2" />
+<PackageReference Include="Penghou.Nuwa" Version="1.0.0" />
 ```
 
 Targets `net8.0`, `net9.0`, and `net10.0`. For Microsoft.Extensions.AI
@@ -178,6 +178,17 @@ deterministic token spelling. Nulls, objects, arrays, and existing strings are
 never stringified. This establishes Nuwa-level structural compatibility; it
 does not establish that values such as `"1"` are meaningful filenames.
 
+## New in 1.0: stable contract, clean pipeline
+
+1.0 graduates the 0.6 feature set with no behavior changes:
+
+- The public API is locked by Roslyn public API analyzer baselines
+  (`PublicAPI.Shipped.txt` in each library project); accidental
+  additions, removals, or signature changes fail the build.
+- Build requirements met: `net8.0`/`net9.0`/`net10.0` multi-targeting,
+  package validation, deterministic builds, and a vulnerability-free
+  restore (SourceLink 10.0.401).
+
 ## New in 0.6: truncation salvage, payload extraction, coercions, confidence, streaming
 
 ### Truncation-aware partial salvage
@@ -308,7 +319,7 @@ OpenAI, Ollama, Semantic Kernel, and anything else that exposes an
 has done its work, so you get the fixes without forking provider SDKs.
 
 ```xml
-<PackageReference Include="Penghou.Nuwa.Extensions.AI" Version="0.6.2" />
+<PackageReference Include="Penghou.Nuwa.Extensions.AI" Version="1.0.0" />
 ```
 
 Two things get repaired, transparently:

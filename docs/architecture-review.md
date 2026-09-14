@@ -128,6 +128,11 @@ mutating message content.
 
 - CI already runs a three-TFM build/test matrix with coverage — good.
 - **API surface is snapshotted by test** (`PublicApiContractTests`) rather than the `PublicApiAnalyzers` baseline files used in sibling repos; either approach works, but the file-based baseline gives review-visible diffs on API change.
+  > **Update (1.0 graduation)** — adopted the file-based baseline: each
+  > library now ships `PublicAPI.Shipped.txt`/`PublicAPI.Unshipped.txt`
+  > enforced by `Microsoft.CodeAnalysis.PublicApiAnalyzers` under
+  > warnings-as-errors, and `PublicApiContractTests` was removed. The
+  > analyzer baseline covers the identical core contract in stricter detail.
 - No `.editorconfig`; format verify not in CI.
 - Package validation enabled — good.
 

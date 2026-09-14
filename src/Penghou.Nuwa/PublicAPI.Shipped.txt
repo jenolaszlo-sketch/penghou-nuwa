@@ -1,0 +1,343 @@
+#nullable enable
+~override Penghou.Nuwa.NodeRepairAttempt.Equals(object obj) -> bool
+~override Penghou.Nuwa.NodeRepairAttempt.ToString() -> string
+~override Penghou.Nuwa.TextRepairAttempt.Equals(object obj) -> bool
+~override Penghou.Nuwa.TextRepairAttempt.ToString() -> string
+abstract Penghou.Nuwa.JsonRepairStreamEvent.<Clone>$() -> Penghou.Nuwa.JsonRepairStreamEvent!
+override Penghou.Nuwa.JsonRepairLimits.Equals(object? obj) -> bool
+override Penghou.Nuwa.JsonRepairLimits.GetHashCode() -> int
+override Penghou.Nuwa.JsonRepairLimits.ToString() -> string!
+override Penghou.Nuwa.JsonRepairStreamCompleted.<Clone>$() -> Penghou.Nuwa.JsonRepairStreamCompleted!
+override Penghou.Nuwa.JsonRepairStreamCompleted.Equals(object? obj) -> bool
+override Penghou.Nuwa.JsonRepairStreamCompleted.GetHashCode() -> int
+override Penghou.Nuwa.JsonRepairStreamCompleted.ToString() -> string!
+override Penghou.Nuwa.JsonRepairStreamDelta.<Clone>$() -> Penghou.Nuwa.JsonRepairStreamDelta!
+override Penghou.Nuwa.JsonRepairStreamDelta.Equals(object? obj) -> bool
+override Penghou.Nuwa.JsonRepairStreamDelta.GetHashCode() -> int
+override Penghou.Nuwa.JsonRepairStreamDelta.ToString() -> string!
+override Penghou.Nuwa.JsonRepairStreamEvent.Equals(object? obj) -> bool
+override Penghou.Nuwa.JsonRepairStreamEvent.GetHashCode() -> int
+override Penghou.Nuwa.JsonRepairStreamEvent.ToString() -> string!
+override Penghou.Nuwa.JsonSchemaBranch.Equals(object? obj) -> bool
+override Penghou.Nuwa.JsonSchemaBranch.GetHashCode() -> int
+override Penghou.Nuwa.JsonSchemaBranch.ToString() -> string!
+override Penghou.Nuwa.JsonSchemaExpectation.Equals(object? obj) -> bool
+override Penghou.Nuwa.JsonSchemaExpectation.GetHashCode() -> int
+override Penghou.Nuwa.JsonSchemaExpectation.ToString() -> string!
+override Penghou.Nuwa.NodeRepairAttempt.GetHashCode() -> int
+override Penghou.Nuwa.StrategyReport.Equals(object? obj) -> bool
+override Penghou.Nuwa.StrategyReport.GetHashCode() -> int
+override Penghou.Nuwa.StrategyReport.ToString() -> string!
+override Penghou.Nuwa.TextRepairAttempt.GetHashCode() -> int
+override Penghou.Nuwa.TolerantRecoveryReport.Equals(object? obj) -> bool
+override Penghou.Nuwa.TolerantRecoveryReport.GetHashCode() -> int
+override Penghou.Nuwa.TolerantRecoveryReport.ToString() -> string!
+override sealed Penghou.Nuwa.JsonRepairStreamCompleted.Equals(Penghou.Nuwa.JsonRepairStreamEvent? other) -> bool
+override sealed Penghou.Nuwa.JsonRepairStreamDelta.Equals(Penghou.Nuwa.JsonRepairStreamEvent? other) -> bool
+Penghou.Nuwa.Extensions.ServiceCollectionExtensions
+Penghou.Nuwa.IJsonRepairPipeline
+Penghou.Nuwa.IJsonRepairPipeline.RepairAsync(string! input, Penghou.Nuwa.JsonSchemaExpectation? expectation = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.JsonRepairResult!>
+Penghou.Nuwa.IJsonRepairPipeline.RepairStreamAsync(System.Collections.Generic.IAsyncEnumerable<string!>! chunks, Penghou.Nuwa.JsonSchemaExpectation? expectation = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Penghou.Nuwa.JsonRepairStreamEvent!>!
+Penghou.Nuwa.JsonRepair
+Penghou.Nuwa.JsonRepairLimitException
+Penghou.Nuwa.JsonRepairLimitException.JsonRepairLimitException(string! message) -> void
+Penghou.Nuwa.JsonRepairLimits
+Penghou.Nuwa.JsonRepairLimits.<Clone>$() -> Penghou.Nuwa.JsonRepairLimits!
+Penghou.Nuwa.JsonRepairLimits.Equals(Penghou.Nuwa.JsonRepairLimits? other) -> bool
+Penghou.Nuwa.JsonRepairLimits.JsonRepairLimits() -> void
+Penghou.Nuwa.JsonRepairLimits.MaxCorrections.get -> int
+Penghou.Nuwa.JsonRepairLimits.MaxCorrections.init -> void
+Penghou.Nuwa.JsonRepairLimits.MaxDepth.get -> int
+Penghou.Nuwa.JsonRepairLimits.MaxDepth.init -> void
+Penghou.Nuwa.JsonRepairLimits.MaxInputLength.get -> int
+Penghou.Nuwa.JsonRepairLimits.MaxInputLength.init -> void
+Penghou.Nuwa.JsonRepairLimits.MaxOutputLength.get -> int
+Penghou.Nuwa.JsonRepairLimits.MaxOutputLength.init -> void
+Penghou.Nuwa.JsonRepairOptions
+Penghou.Nuwa.JsonRepairOptions.AddNodeRepair(Penghou.Nuwa.Strategies.INodeRepair! instance) -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.AddNodeRepair<T>() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.AddNodeRepair<T>(System.Func<T!>! factory) -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.AddSalvageRepair(Penghou.Nuwa.Strategies.ITextRepair! instance) -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.AddSalvageRepair<T>() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.AddSalvageRepair<T>(System.Func<T!>! factory) -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.AddTextRepair(Penghou.Nuwa.Strategies.ITextRepair! instance) -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.AddTextRepair<T>() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.AddTextRepair<T>(System.Func<T!>! factory) -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.AllowTruncationSalvage.get -> bool
+Penghou.Nuwa.JsonRepairOptions.AllowTruncationSalvage.set -> void
+Penghou.Nuwa.JsonRepairOptions.ClearNodeRepairs() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.ClearTextRepairs() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.DisableSalvageFallback() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.EnableRequiredPropertyReconciliation() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.EnableSchemaCoercions() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.EnableStructuralPropertyReconciliation() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.InsertNodeRepairAfter<TAnchor, TNew>() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.InsertSalvageRepairAfter<TAnchor, TNew>() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.InsertTextRepairAfter<TAnchor, TNew>() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.JsonRepairOptions() -> void
+Penghou.Nuwa.JsonRepairOptions.Limits.get -> Penghou.Nuwa.JsonRepairLimits!
+Penghou.Nuwa.JsonRepairOptions.Limits.set -> void
+Penghou.Nuwa.JsonRepairOptions.NodeRepairs.get -> System.Collections.Generic.IReadOnlyList<System.Type!>!
+Penghou.Nuwa.JsonRepairOptions.RemoveNodeRepair<T>() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.RemoveSalvageRepair<T>() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.RemoveTextRepair<T>() -> Penghou.Nuwa.JsonRepairOptions!
+Penghou.Nuwa.JsonRepairOptions.SalvageRepairs.get -> System.Collections.Generic.IReadOnlyList<System.Type!>!
+Penghou.Nuwa.JsonRepairOptions.TextRepairs.get -> System.Collections.Generic.IReadOnlyList<System.Type!>!
+Penghou.Nuwa.JsonRepairPipeline
+Penghou.Nuwa.JsonRepairPipeline.JsonRepairPipeline(System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.ITextRepair!>! textRepairs, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.ITextRepair!>! salvageRepairs, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.INodeRepair!>! nodeRepairs, Microsoft.Extensions.Logging.ILogger<Penghou.Nuwa.JsonRepairPipeline!>! logger) -> void
+Penghou.Nuwa.JsonRepairPipeline.JsonRepairPipeline(System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.ITextRepair!>! textRepairs, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.ITextRepair!>! salvageRepairs, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.INodeRepair!>! nodeRepairs, Microsoft.Extensions.Logging.ILogger<Penghou.Nuwa.JsonRepairPipeline!>! logger, Penghou.Nuwa.JsonRepairLimits! limits) -> void
+Penghou.Nuwa.JsonRepairPipeline.JsonRepairPipeline(System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.ITextRepair!>! textRepairs, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.ITextRepair!>! salvageRepairs, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.Strategies.INodeRepair!>! nodeRepairs, Microsoft.Extensions.Logging.ILogger<Penghou.Nuwa.JsonRepairPipeline!>! logger, Penghou.Nuwa.JsonRepairLimits! limits, bool allowTruncationSalvage) -> void
+Penghou.Nuwa.JsonRepairPipeline.RepairAsync(string! input, Penghou.Nuwa.JsonSchemaExpectation? expectation = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.JsonRepairResult!>
+Penghou.Nuwa.JsonRepairPipeline.RepairStreamAsync(System.Collections.Generic.IAsyncEnumerable<string!>! chunks, Penghou.Nuwa.JsonSchemaExpectation? expectation = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<Penghou.Nuwa.JsonRepairStreamEvent!>!
+Penghou.Nuwa.JsonRepairResult
+Penghou.Nuwa.JsonRepairResult.Confidence.get -> double
+Penghou.Nuwa.JsonRepairResult.Dispose() -> void
+Penghou.Nuwa.JsonRepairResult.Document.get -> System.Text.Json.JsonDocument?
+Penghou.Nuwa.JsonRepairResult.GetDocumentOrThrow() -> System.Text.Json.JsonDocument!
+Penghou.Nuwa.JsonRepairResult.GetRepairedTextOrThrow() -> string!
+Penghou.Nuwa.JsonRepairResult.GetRootOrThrow() -> System.Text.Json.Nodes.JsonNode!
+Penghou.Nuwa.JsonRepairResult.IsConfident(double minimumConfidence) -> bool
+Penghou.Nuwa.JsonRepairResult.IsRepairAccepted.get -> bool
+Penghou.Nuwa.JsonRepairResult.JsonRepairResult(System.Text.Json.JsonDocument? document, System.Text.Json.Nodes.JsonNode? root, string! originalText, string? repairedText, bool wasRepaired, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>! textRepairs, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>! nodeRepairs) -> void
+Penghou.Nuwa.JsonRepairResult.NodeRepairs.get -> System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>!
+Penghou.Nuwa.JsonRepairResult.OriginalText.get -> string!
+Penghou.Nuwa.JsonRepairResult.RepairedText.get -> string?
+Penghou.Nuwa.JsonRepairResult.Root.get -> System.Text.Json.Nodes.JsonNode?
+Penghou.Nuwa.JsonRepairResult.ShapeErrors.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Penghou.Nuwa.JsonRepairResult.ShapeStatus.get -> Penghou.Nuwa.JsonRepairShapeStatus
+Penghou.Nuwa.JsonRepairResult.Succeeded.get -> bool
+Penghou.Nuwa.JsonRepairResult.SucceededBy.get -> Penghou.Nuwa.StrategyReport?
+Penghou.Nuwa.JsonRepairResult.TextRepairs.get -> System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>!
+Penghou.Nuwa.JsonRepairResult.TolerantRecovery.get -> Penghou.Nuwa.TolerantRecoveryReport?
+Penghou.Nuwa.JsonRepairResult.WasRepaired.get -> bool
+Penghou.Nuwa.JsonRepairShapeStatus
+Penghou.Nuwa.JsonRepairShapeStatus.Matched = 1 -> Penghou.Nuwa.JsonRepairShapeStatus
+Penghou.Nuwa.JsonRepairShapeStatus.Mismatched = 2 -> Penghou.Nuwa.JsonRepairShapeStatus
+Penghou.Nuwa.JsonRepairShapeStatus.NotEvaluated = 0 -> Penghou.Nuwa.JsonRepairShapeStatus
+Penghou.Nuwa.JsonRepairStreamCompleted
+Penghou.Nuwa.JsonRepairStreamCompleted.Deconstruct(out Penghou.Nuwa.JsonRepairResult! Result) -> void
+Penghou.Nuwa.JsonRepairStreamCompleted.Equals(Penghou.Nuwa.JsonRepairStreamCompleted? other) -> bool
+Penghou.Nuwa.JsonRepairStreamCompleted.JsonRepairStreamCompleted(Penghou.Nuwa.JsonRepairResult! Result) -> void
+Penghou.Nuwa.JsonRepairStreamCompleted.Result.get -> Penghou.Nuwa.JsonRepairResult!
+Penghou.Nuwa.JsonRepairStreamCompleted.Result.init -> void
+Penghou.Nuwa.JsonRepairStreamDelta
+Penghou.Nuwa.JsonRepairStreamDelta.Deconstruct(out int Offset, out string! Text) -> void
+Penghou.Nuwa.JsonRepairStreamDelta.Equals(Penghou.Nuwa.JsonRepairStreamDelta? other) -> bool
+Penghou.Nuwa.JsonRepairStreamDelta.JsonRepairStreamDelta(int Offset, string! Text) -> void
+Penghou.Nuwa.JsonRepairStreamDelta.Offset.get -> int
+Penghou.Nuwa.JsonRepairStreamDelta.Offset.init -> void
+Penghou.Nuwa.JsonRepairStreamDelta.Text.get -> string!
+Penghou.Nuwa.JsonRepairStreamDelta.Text.init -> void
+Penghou.Nuwa.JsonRepairStreamEvent
+Penghou.Nuwa.JsonRepairStreamEvent.JsonRepairStreamEvent() -> void
+Penghou.Nuwa.JsonRepairStreamEvent.JsonRepairStreamEvent(Penghou.Nuwa.JsonRepairStreamEvent! original) -> void
+Penghou.Nuwa.JsonSchemaBranch
+Penghou.Nuwa.JsonSchemaBranch.<Clone>$() -> Penghou.Nuwa.JsonSchemaBranch!
+Penghou.Nuwa.JsonSchemaBranch.Deconstruct(out Penghou.Nuwa.JsonSchemaExpectation! Expectation, out string? DiscriminatorProperty, out System.Collections.Generic.IReadOnlySet<string!>? DiscriminatorValues) -> void
+Penghou.Nuwa.JsonSchemaBranch.DiscriminatorProperty.get -> string?
+Penghou.Nuwa.JsonSchemaBranch.DiscriminatorProperty.init -> void
+Penghou.Nuwa.JsonSchemaBranch.DiscriminatorValues.get -> System.Collections.Generic.IReadOnlySet<string!>?
+Penghou.Nuwa.JsonSchemaBranch.DiscriminatorValues.init -> void
+Penghou.Nuwa.JsonSchemaBranch.Equals(Penghou.Nuwa.JsonSchemaBranch? other) -> bool
+Penghou.Nuwa.JsonSchemaBranch.Expectation.get -> Penghou.Nuwa.JsonSchemaExpectation!
+Penghou.Nuwa.JsonSchemaBranch.Expectation.init -> void
+Penghou.Nuwa.JsonSchemaBranch.JsonSchemaBranch(Penghou.Nuwa.JsonSchemaExpectation! Expectation, string? DiscriminatorProperty = null, System.Collections.Generic.IReadOnlySet<string!>? DiscriminatorValues = null) -> void
+Penghou.Nuwa.JsonSchemaExpectation
+Penghou.Nuwa.JsonSchemaExpectation.<Clone>$() -> Penghou.Nuwa.JsonSchemaExpectation!
+Penghou.Nuwa.JsonSchemaExpectation.Branches.get -> System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.JsonSchemaBranch!>!
+Penghou.Nuwa.JsonSchemaExpectation.Branches.init -> void
+Penghou.Nuwa.JsonSchemaExpectation.Deconstruct(out System.Collections.Generic.IReadOnlyDictionary<string!, Penghou.Nuwa.JsonSchemaFieldKind>! PropertyKinds, out System.Text.Json.Nodes.JsonNode? Schema, out bool Nullable) -> void
+Penghou.Nuwa.JsonSchemaExpectation.Equals(Penghou.Nuwa.JsonSchemaExpectation? other) -> bool
+Penghou.Nuwa.JsonSchemaExpectation.ExpectedKind.get -> Penghou.Nuwa.JsonSchemaFieldKind?
+Penghou.Nuwa.JsonSchemaExpectation.GetItem() -> Penghou.Nuwa.JsonSchemaExpectation?
+Penghou.Nuwa.JsonSchemaExpectation.GetProperty(string! propertyName) -> Penghou.Nuwa.JsonSchemaExpectation?
+Penghou.Nuwa.JsonSchemaExpectation.GetStringPropertyNames() -> System.Collections.Generic.IReadOnlySet<string!>!
+Penghou.Nuwa.JsonSchemaExpectation.JsonSchemaExpectation(System.Collections.Generic.IReadOnlyDictionary<string!, Penghou.Nuwa.JsonSchemaFieldKind>! PropertyKinds, System.Text.Json.Nodes.JsonNode? Schema = null, bool Nullable = false) -> void
+Penghou.Nuwa.JsonSchemaExpectation.Nullable.get -> bool
+Penghou.Nuwa.JsonSchemaExpectation.Nullable.init -> void
+Penghou.Nuwa.JsonSchemaExpectation.PropertyKinds.get -> System.Collections.Generic.IReadOnlyDictionary<string!, Penghou.Nuwa.JsonSchemaFieldKind>!
+Penghou.Nuwa.JsonSchemaExpectation.PropertyKinds.init -> void
+Penghou.Nuwa.JsonSchemaExpectation.Schema.get -> System.Text.Json.Nodes.JsonNode?
+Penghou.Nuwa.JsonSchemaExpectation.Schema.init -> void
+Penghou.Nuwa.JsonSchemaExpectation.Validate(System.Text.Json.Nodes.JsonNode! node) -> System.Collections.Generic.IReadOnlyList<string!>!
+Penghou.Nuwa.JsonSchemaExpectation.ValidateShape(System.Text.Json.Nodes.JsonNode! node) -> System.Collections.Generic.IReadOnlyList<string!>!
+Penghou.Nuwa.JsonSchemaFieldKind
+Penghou.Nuwa.JsonSchemaFieldKind.Array = 4 -> Penghou.Nuwa.JsonSchemaFieldKind
+Penghou.Nuwa.JsonSchemaFieldKind.Boolean = 2 -> Penghou.Nuwa.JsonSchemaFieldKind
+Penghou.Nuwa.JsonSchemaFieldKind.Number = 1 -> Penghou.Nuwa.JsonSchemaFieldKind
+Penghou.Nuwa.JsonSchemaFieldKind.Object = 3 -> Penghou.Nuwa.JsonSchemaFieldKind
+Penghou.Nuwa.JsonSchemaFieldKind.String = 0 -> Penghou.Nuwa.JsonSchemaFieldKind
+Penghou.Nuwa.NodeRepairAttempt
+Penghou.Nuwa.NodeRepairAttempt.Deconstruct(out Penghou.Nuwa.RepairOutcome Outcome, out System.Text.Json.Nodes.JsonNode? Repaired, out string? Note) -> void
+Penghou.Nuwa.NodeRepairAttempt.Equals(Penghou.Nuwa.NodeRepairAttempt other) -> bool
+Penghou.Nuwa.NodeRepairAttempt.NodeRepairAttempt() -> void
+Penghou.Nuwa.NodeRepairAttempt.NodeRepairAttempt(Penghou.Nuwa.RepairOutcome Outcome, System.Text.Json.Nodes.JsonNode? Repaired, string? Note = null) -> void
+Penghou.Nuwa.NodeRepairAttempt.Note.get -> string?
+Penghou.Nuwa.NodeRepairAttempt.Note.init -> void
+Penghou.Nuwa.NodeRepairAttempt.Outcome.get -> Penghou.Nuwa.RepairOutcome
+Penghou.Nuwa.NodeRepairAttempt.Outcome.init -> void
+Penghou.Nuwa.NodeRepairAttempt.Repaired.get -> System.Text.Json.Nodes.JsonNode?
+Penghou.Nuwa.NodeRepairAttempt.Repaired.init -> void
+Penghou.Nuwa.RepairOutcome
+Penghou.Nuwa.RepairOutcome.Failed = 1 -> Penghou.Nuwa.RepairOutcome
+Penghou.Nuwa.RepairOutcome.NotApplicable = 0 -> Penghou.Nuwa.RepairOutcome
+Penghou.Nuwa.RepairOutcome.Repaired = 2 -> Penghou.Nuwa.RepairOutcome
+Penghou.Nuwa.Strategies.ConcatenatedJsonExtractionStrategy
+Penghou.Nuwa.Strategies.ConcatenatedJsonExtractionStrategy.ConcatenatedJsonExtractionStrategy() -> void
+Penghou.Nuwa.Strategies.ConcatenatedJsonExtractionStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.ConcatenatedJsonExtractionStrategy.RepairAsync(string! input, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.TextRepairAttempt>
+Penghou.Nuwa.Strategies.INodeRepair
+Penghou.Nuwa.Strategies.INodeRepair.Name.get -> string!
+Penghou.Nuwa.Strategies.INodeRepair.RepairAsync(System.Text.Json.Nodes.JsonNode! node, Penghou.Nuwa.JsonSchemaExpectation! expectation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt>
+Penghou.Nuwa.Strategies.ITextRepair
+Penghou.Nuwa.Strategies.ITextRepair.Name.get -> string!
+Penghou.Nuwa.Strategies.ITextRepair.RepairAsync(string! input, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.TextRepairAttempt>
+Penghou.Nuwa.Strategies.MarkdownJsonFenceRepairStrategy
+Penghou.Nuwa.Strategies.MarkdownJsonFenceRepairStrategy.MarkdownJsonFenceRepairStrategy() -> void
+Penghou.Nuwa.Strategies.MarkdownJsonFenceRepairStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.MarkdownJsonFenceRepairStrategy.RepairAsync(string! input, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.TextRepairAttempt>
+Penghou.Nuwa.Strategies.ProseWrapperExtractionStrategy
+Penghou.Nuwa.Strategies.ProseWrapperExtractionStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.ProseWrapperExtractionStrategy.ProseWrapperExtractionStrategy() -> void
+Penghou.Nuwa.Strategies.ProseWrapperExtractionStrategy.RepairAsync(string! input, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.TextRepairAttempt>
+Penghou.Nuwa.Strategies.PseudoCSharpVerbatimStringRepairStrategy
+Penghou.Nuwa.Strategies.PseudoCSharpVerbatimStringRepairStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.PseudoCSharpVerbatimStringRepairStrategy.PseudoCSharpVerbatimStringRepairStrategy() -> void
+Penghou.Nuwa.Strategies.PseudoCSharpVerbatimStringRepairStrategy.RepairAsync(string! input, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.TextRepairAttempt>
+Penghou.Nuwa.Strategies.PseudoJavaScriptTemplateStringRepairStrategy
+Penghou.Nuwa.Strategies.PseudoJavaScriptTemplateStringRepairStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.PseudoJavaScriptTemplateStringRepairStrategy.PseudoJavaScriptTemplateStringRepairStrategy() -> void
+Penghou.Nuwa.Strategies.PseudoJavaScriptTemplateStringRepairStrategy.RepairAsync(string! input, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.TextRepairAttempt>
+Penghou.Nuwa.Strategies.SalvageRepairStrategy
+Penghou.Nuwa.Strategies.SalvageRepairStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.SalvageRepairStrategy.RepairAsync(string! input, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.TextRepairAttempt>
+Penghou.Nuwa.Strategies.SalvageRepairStrategy.SalvageRepairStrategy() -> void
+Penghou.Nuwa.Strategies.SchemaGuidedArrayWrapStrategy
+Penghou.Nuwa.Strategies.SchemaGuidedArrayWrapStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.SchemaGuidedArrayWrapStrategy.RepairAsync(System.Text.Json.Nodes.JsonNode! node, Penghou.Nuwa.JsonSchemaExpectation! expectation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt>
+Penghou.Nuwa.Strategies.SchemaGuidedArrayWrapStrategy.SchemaGuidedArrayWrapStrategy() -> void
+Penghou.Nuwa.Strategies.SchemaGuidedEnumFuzzyMatchStrategy
+Penghou.Nuwa.Strategies.SchemaGuidedEnumFuzzyMatchStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.SchemaGuidedEnumFuzzyMatchStrategy.RepairAsync(System.Text.Json.Nodes.JsonNode! node, Penghou.Nuwa.JsonSchemaExpectation! expectation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt>
+Penghou.Nuwa.Strategies.SchemaGuidedEnumFuzzyMatchStrategy.SchemaGuidedEnumFuzzyMatchStrategy() -> void
+Penghou.Nuwa.Strategies.SchemaGuidedJsonStringExpansionStrategy
+Penghou.Nuwa.Strategies.SchemaGuidedJsonStringExpansionStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.SchemaGuidedJsonStringExpansionStrategy.RepairAsync(System.Text.Json.Nodes.JsonNode! node, Penghou.Nuwa.JsonSchemaExpectation! expectation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt>
+Penghou.Nuwa.Strategies.SchemaGuidedJsonStringExpansionStrategy.SchemaGuidedJsonStringExpansionStrategy() -> void
+Penghou.Nuwa.Strategies.SchemaGuidedOptionalNullRemovalStrategy
+Penghou.Nuwa.Strategies.SchemaGuidedOptionalNullRemovalStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.SchemaGuidedOptionalNullRemovalStrategy.RepairAsync(System.Text.Json.Nodes.JsonNode! node, Penghou.Nuwa.JsonSchemaExpectation! expectation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt>
+Penghou.Nuwa.Strategies.SchemaGuidedOptionalNullRemovalStrategy.SchemaGuidedOptionalNullRemovalStrategy() -> void
+Penghou.Nuwa.Strategies.SchemaGuidedRequiredPropertyReconciliationStrategy
+Penghou.Nuwa.Strategies.SchemaGuidedRequiredPropertyReconciliationStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.SchemaGuidedRequiredPropertyReconciliationStrategy.RepairAsync(System.Text.Json.Nodes.JsonNode! node, Penghou.Nuwa.JsonSchemaExpectation! expectation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt>
+Penghou.Nuwa.Strategies.SchemaGuidedRequiredPropertyReconciliationStrategy.SchemaGuidedRequiredPropertyReconciliationStrategy() -> void
+Penghou.Nuwa.Strategies.SchemaGuidedScalarToStringCoercionStrategy
+Penghou.Nuwa.Strategies.SchemaGuidedScalarToStringCoercionStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.SchemaGuidedScalarToStringCoercionStrategy.RepairAsync(System.Text.Json.Nodes.JsonNode! node, Penghou.Nuwa.JsonSchemaExpectation! expectation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt>
+Penghou.Nuwa.Strategies.SchemaGuidedScalarToStringCoercionStrategy.SchemaGuidedScalarToStringCoercionStrategy() -> void
+Penghou.Nuwa.Strategies.SchemaGuidedStringToBooleanCoercionStrategy
+Penghou.Nuwa.Strategies.SchemaGuidedStringToBooleanCoercionStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.SchemaGuidedStringToBooleanCoercionStrategy.RepairAsync(System.Text.Json.Nodes.JsonNode! node, Penghou.Nuwa.JsonSchemaExpectation! expectation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt>
+Penghou.Nuwa.Strategies.SchemaGuidedStringToBooleanCoercionStrategy.SchemaGuidedStringToBooleanCoercionStrategy() -> void
+Penghou.Nuwa.Strategies.SchemaGuidedStringToNumberCoercionStrategy
+Penghou.Nuwa.Strategies.SchemaGuidedStringToNumberCoercionStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.SchemaGuidedStringToNumberCoercionStrategy.RepairAsync(System.Text.Json.Nodes.JsonNode! node, Penghou.Nuwa.JsonSchemaExpectation! expectation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt>
+Penghou.Nuwa.Strategies.SchemaGuidedStringToNumberCoercionStrategy.SchemaGuidedStringToNumberCoercionStrategy() -> void
+Penghou.Nuwa.Strategies.SchemaGuidedStructuralPropertyReconciliationStrategy
+Penghou.Nuwa.Strategies.SchemaGuidedStructuralPropertyReconciliationStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.SchemaGuidedStructuralPropertyReconciliationStrategy.RepairAsync(System.Text.Json.Nodes.JsonNode! node, Penghou.Nuwa.JsonSchemaExpectation! expectation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt>
+Penghou.Nuwa.Strategies.SchemaGuidedStructuralPropertyReconciliationStrategy.SchemaGuidedStructuralPropertyReconciliationStrategy() -> void
+Penghou.Nuwa.Strategies.SchemaGuidedUnknownPropertyPruneStrategy
+Penghou.Nuwa.Strategies.SchemaGuidedUnknownPropertyPruneStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.SchemaGuidedUnknownPropertyPruneStrategy.RepairAsync(System.Text.Json.Nodes.JsonNode! node, Penghou.Nuwa.JsonSchemaExpectation! expectation, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.NodeRepairAttempt>
+Penghou.Nuwa.Strategies.SchemaGuidedUnknownPropertyPruneStrategy.SchemaGuidedUnknownPropertyPruneStrategy() -> void
+Penghou.Nuwa.Strategies.UnicodeDelimiterNormalizationStrategy
+Penghou.Nuwa.Strategies.UnicodeDelimiterNormalizationStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.UnicodeDelimiterNormalizationStrategy.RepairAsync(string! input, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.TextRepairAttempt>
+Penghou.Nuwa.Strategies.UnicodeDelimiterNormalizationStrategy.UnicodeDelimiterNormalizationStrategy() -> void
+Penghou.Nuwa.Strategies.XmlWrappedExtractionStrategy
+Penghou.Nuwa.Strategies.XmlWrappedExtractionStrategy.Name.get -> string!
+Penghou.Nuwa.Strategies.XmlWrappedExtractionStrategy.RepairAsync(string! input, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.TextRepairAttempt>
+Penghou.Nuwa.Strategies.XmlWrappedExtractionStrategy.XmlWrappedExtractionStrategy() -> void
+Penghou.Nuwa.StrategyReport
+Penghou.Nuwa.StrategyReport.<Clone>$() -> Penghou.Nuwa.StrategyReport!
+Penghou.Nuwa.StrategyReport.Deconstruct(out string! Name, out Penghou.Nuwa.StrategyStatus Status, out string? Repaired, out string? Note) -> void
+Penghou.Nuwa.StrategyReport.Equals(Penghou.Nuwa.StrategyReport? other) -> bool
+Penghou.Nuwa.StrategyReport.Name.get -> string!
+Penghou.Nuwa.StrategyReport.Name.init -> void
+Penghou.Nuwa.StrategyReport.Note.get -> string?
+Penghou.Nuwa.StrategyReport.Note.init -> void
+Penghou.Nuwa.StrategyReport.Repaired.get -> string?
+Penghou.Nuwa.StrategyReport.Repaired.init -> void
+Penghou.Nuwa.StrategyReport.Status.get -> Penghou.Nuwa.StrategyStatus
+Penghou.Nuwa.StrategyReport.Status.init -> void
+Penghou.Nuwa.StrategyReport.StrategyReport(string! Name, Penghou.Nuwa.StrategyStatus Status, string? Repaired = null, string? Note = null) -> void
+Penghou.Nuwa.StrategyStatus
+Penghou.Nuwa.StrategyStatus.Failed = 2 -> Penghou.Nuwa.StrategyStatus
+Penghou.Nuwa.StrategyStatus.NotApplicable = 1 -> Penghou.Nuwa.StrategyStatus
+Penghou.Nuwa.StrategyStatus.Skipped = 0 -> Penghou.Nuwa.StrategyStatus
+Penghou.Nuwa.StrategyStatus.Succeeded = 3 -> Penghou.Nuwa.StrategyStatus
+Penghou.Nuwa.TextRepairAttempt
+Penghou.Nuwa.TextRepairAttempt.Deconstruct(out Penghou.Nuwa.RepairOutcome Outcome, out string? Repaired, out string? Note) -> void
+Penghou.Nuwa.TextRepairAttempt.Equals(Penghou.Nuwa.TextRepairAttempt other) -> bool
+Penghou.Nuwa.TextRepairAttempt.Note.get -> string?
+Penghou.Nuwa.TextRepairAttempt.Note.init -> void
+Penghou.Nuwa.TextRepairAttempt.Outcome.get -> Penghou.Nuwa.RepairOutcome
+Penghou.Nuwa.TextRepairAttempt.Outcome.init -> void
+Penghou.Nuwa.TextRepairAttempt.Repaired.get -> string?
+Penghou.Nuwa.TextRepairAttempt.Repaired.init -> void
+Penghou.Nuwa.TextRepairAttempt.TextRepairAttempt() -> void
+Penghou.Nuwa.TextRepairAttempt.TextRepairAttempt(Penghou.Nuwa.RepairOutcome Outcome, string? Repaired, string? Note = null) -> void
+Penghou.Nuwa.TolerantRecoveryReport
+Penghou.Nuwa.TolerantRecoveryReport.<Clone>$() -> Penghou.Nuwa.TolerantRecoveryReport!
+Penghou.Nuwa.TolerantRecoveryReport.CorrectionCount.get -> int
+Penghou.Nuwa.TolerantRecoveryReport.CorrectionCount.init -> void
+Penghou.Nuwa.TolerantRecoveryReport.Corrections.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Penghou.Nuwa.TolerantRecoveryReport.Corrections.init -> void
+Penghou.Nuwa.TolerantRecoveryReport.Deconstruct(out bool Succeeded, out string! Outcome, out int CorrectionCount, out int SchemaGuidedStringCorrectionCount, out System.Collections.Generic.IReadOnlyList<string!>! Corrections) -> void
+Penghou.Nuwa.TolerantRecoveryReport.Equals(Penghou.Nuwa.TolerantRecoveryReport? other) -> bool
+Penghou.Nuwa.TolerantRecoveryReport.Outcome.get -> string!
+Penghou.Nuwa.TolerantRecoveryReport.Outcome.init -> void
+Penghou.Nuwa.TolerantRecoveryReport.SchemaGuidedStringCorrectionCount.get -> int
+Penghou.Nuwa.TolerantRecoveryReport.SchemaGuidedStringCorrectionCount.init -> void
+Penghou.Nuwa.TolerantRecoveryReport.Succeeded.get -> bool
+Penghou.Nuwa.TolerantRecoveryReport.Succeeded.init -> void
+Penghou.Nuwa.TolerantRecoveryReport.TolerantRecoveryReport(bool Succeeded, string! Outcome, int CorrectionCount, int SchemaGuidedStringCorrectionCount, System.Collections.Generic.IReadOnlyList<string!>! Corrections) -> void
+static Penghou.Nuwa.Extensions.ServiceCollectionExtensions.AddJsonRepair(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Penghou.Nuwa.Extensions.ServiceCollectionExtensions.AddJsonRepair(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Penghou.Nuwa.JsonRepairOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Penghou.Nuwa.JsonRepair.RepairAsync(string! input, Penghou.Nuwa.JsonSchemaExpectation? expectation = null, System.Action<Penghou.Nuwa.JsonRepairOptions!>? configure = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<Penghou.Nuwa.JsonRepairResult!>
+static Penghou.Nuwa.JsonRepairLimits.Default.get -> Penghou.Nuwa.JsonRepairLimits!
+static Penghou.Nuwa.JsonRepairLimits.operator !=(Penghou.Nuwa.JsonRepairLimits? left, Penghou.Nuwa.JsonRepairLimits? right) -> bool
+static Penghou.Nuwa.JsonRepairLimits.operator ==(Penghou.Nuwa.JsonRepairLimits? left, Penghou.Nuwa.JsonRepairLimits? right) -> bool
+static Penghou.Nuwa.JsonRepairPipeline.Create(System.Action<Penghou.Nuwa.JsonRepairOptions!>? configure = null) -> Penghou.Nuwa.JsonRepairPipeline!
+static Penghou.Nuwa.JsonRepairResult.Failure(string! originalText, string? repairedText, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>! textRepairs, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>! nodeRepairs) -> Penghou.Nuwa.JsonRepairResult!
+static Penghou.Nuwa.JsonRepairResult.Success(System.Text.Json.Nodes.JsonNode! root, string! originalText, string! repairedText, bool wasRepaired, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>! textRepairs, System.Collections.Generic.IReadOnlyList<Penghou.Nuwa.StrategyReport!>! nodeRepairs) -> Penghou.Nuwa.JsonRepairResult!
+static Penghou.Nuwa.JsonRepairStreamCompleted.operator !=(Penghou.Nuwa.JsonRepairStreamCompleted? left, Penghou.Nuwa.JsonRepairStreamCompleted? right) -> bool
+static Penghou.Nuwa.JsonRepairStreamCompleted.operator ==(Penghou.Nuwa.JsonRepairStreamCompleted? left, Penghou.Nuwa.JsonRepairStreamCompleted? right) -> bool
+static Penghou.Nuwa.JsonRepairStreamDelta.operator !=(Penghou.Nuwa.JsonRepairStreamDelta? left, Penghou.Nuwa.JsonRepairStreamDelta? right) -> bool
+static Penghou.Nuwa.JsonRepairStreamDelta.operator ==(Penghou.Nuwa.JsonRepairStreamDelta? left, Penghou.Nuwa.JsonRepairStreamDelta? right) -> bool
+static Penghou.Nuwa.JsonRepairStreamEvent.operator !=(Penghou.Nuwa.JsonRepairStreamEvent? left, Penghou.Nuwa.JsonRepairStreamEvent? right) -> bool
+static Penghou.Nuwa.JsonRepairStreamEvent.operator ==(Penghou.Nuwa.JsonRepairStreamEvent? left, Penghou.Nuwa.JsonRepairStreamEvent? right) -> bool
+static Penghou.Nuwa.JsonSchemaBranch.operator !=(Penghou.Nuwa.JsonSchemaBranch? left, Penghou.Nuwa.JsonSchemaBranch? right) -> bool
+static Penghou.Nuwa.JsonSchemaBranch.operator ==(Penghou.Nuwa.JsonSchemaBranch? left, Penghou.Nuwa.JsonSchemaBranch? right) -> bool
+static Penghou.Nuwa.JsonSchemaExpectation.FromSchemaJson(string? schemaJson) -> Penghou.Nuwa.JsonSchemaExpectation?
+static Penghou.Nuwa.JsonSchemaExpectation.FromSchemaNode(System.Text.Json.Nodes.JsonNode! schemaNode) -> Penghou.Nuwa.JsonSchemaExpectation!
+static Penghou.Nuwa.JsonSchemaExpectation.FromType(System.Type! type) -> Penghou.Nuwa.JsonSchemaExpectation!
+static Penghou.Nuwa.JsonSchemaExpectation.FromType(System.Type! type, System.Text.Json.JsonSerializerOptions? options) -> Penghou.Nuwa.JsonSchemaExpectation!
+static Penghou.Nuwa.JsonSchemaExpectation.FromType<T>() -> Penghou.Nuwa.JsonSchemaExpectation!
+static Penghou.Nuwa.JsonSchemaExpectation.FromType<T>(System.Text.Json.JsonSerializerOptions? options) -> Penghou.Nuwa.JsonSchemaExpectation!
+static Penghou.Nuwa.JsonSchemaExpectation.operator !=(Penghou.Nuwa.JsonSchemaExpectation? left, Penghou.Nuwa.JsonSchemaExpectation? right) -> bool
+static Penghou.Nuwa.JsonSchemaExpectation.operator ==(Penghou.Nuwa.JsonSchemaExpectation? left, Penghou.Nuwa.JsonSchemaExpectation? right) -> bool
+static Penghou.Nuwa.NodeRepairAttempt.operator !=(Penghou.Nuwa.NodeRepairAttempt left, Penghou.Nuwa.NodeRepairAttempt right) -> bool
+static Penghou.Nuwa.NodeRepairAttempt.operator ==(Penghou.Nuwa.NodeRepairAttempt left, Penghou.Nuwa.NodeRepairAttempt right) -> bool
+static Penghou.Nuwa.Strategies.SalvageRepairStrategy.TryRepair(string! input) -> string?
+static Penghou.Nuwa.StrategyReport.operator !=(Penghou.Nuwa.StrategyReport? left, Penghou.Nuwa.StrategyReport? right) -> bool
+static Penghou.Nuwa.StrategyReport.operator ==(Penghou.Nuwa.StrategyReport? left, Penghou.Nuwa.StrategyReport? right) -> bool
+static Penghou.Nuwa.TextRepairAttempt.operator !=(Penghou.Nuwa.TextRepairAttempt left, Penghou.Nuwa.TextRepairAttempt right) -> bool
+static Penghou.Nuwa.TextRepairAttempt.operator ==(Penghou.Nuwa.TextRepairAttempt left, Penghou.Nuwa.TextRepairAttempt right) -> bool
+static Penghou.Nuwa.TolerantRecoveryReport.operator !=(Penghou.Nuwa.TolerantRecoveryReport? left, Penghou.Nuwa.TolerantRecoveryReport? right) -> bool
+static Penghou.Nuwa.TolerantRecoveryReport.operator ==(Penghou.Nuwa.TolerantRecoveryReport? left, Penghou.Nuwa.TolerantRecoveryReport? right) -> bool
+virtual Penghou.Nuwa.JsonRepairStreamEvent.EqualityContract.get -> System.Type!
+virtual Penghou.Nuwa.JsonRepairStreamEvent.Equals(Penghou.Nuwa.JsonRepairStreamEvent? other) -> bool
+virtual Penghou.Nuwa.JsonRepairStreamEvent.PrintMembers(System.Text.StringBuilder! builder) -> bool

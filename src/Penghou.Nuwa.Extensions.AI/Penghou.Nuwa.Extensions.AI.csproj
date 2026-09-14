@@ -15,6 +15,11 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
+    <!-- RS0026/RS0027 (optional-parameter overload rules) are suppressed: the
+         pre-1.0 UseJsonRepair/JsonRepairChatClient overload shapes are the locked
+         1.0 contract and must not be reshaped. RS0016/RS0017 still enforce the
+         PublicAPI.Shipped.txt baseline for any additions, removals, or edits. -->
+    <NoWarn>$(NoWarn);RS0026;RS0027</NoWarn>
     <IsPackable>true</IsPackable>
 
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -27,7 +32,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.8.3" />
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.401" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -36,6 +42,11 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
   </ItemGroup>
 
   <ItemGroup>

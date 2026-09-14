@@ -1,5 +1,45 @@
 # Penghou.Nuwa Roadmap
 
+## Status — 1.0 graduated
+
+Nuwa 1.0 is the pipeline described above plus the usability and architecture
+slices below. No new product scope was added for graduation.
+
+Completed for 1.0:
+
+- Usability and operational polish milestone (DI self-sufficiency, fluent
+  configuration symmetry, Markdown transport handling, async/logging hygiene,
+  behavioral coverage on .NET 8, 9, and 10).
+- Architecture slice (injected parser seam, unified phase runners,
+  factory/instance strategy registration, schema-expectation memoization,
+  token-lookahead memoization, trusted internal result construction, causal
+  success credit, output limits on the failure path, AI schema caching,
+  dry applicability scans where already applied).
+- Public API baseline graduation: the 1.0 contract is locked by
+  Roslyn public API analyzer baselines
+  (`src/Penghou.Nuwa/PublicAPI.Shipped.txt` and
+  `src/Penghou.Nuwa.Extensions.AI/PublicAPI.Shipped.txt`, enforced with
+  warnings-as-errors). The old reflection snapshot test was removed; the
+  analyzer baselines cover the identical 42-type core contract in stricter
+  detail. No public API changes were made during migration.
+- Restore/build/package readiness: SourceLink upgraded past the
+  `Microsoft.Build.Tasks.Git 8.0.0` advisory (NU1902), NuGet auditing intact,
+  multi-targeting (`net8.0`/`net9.0`/`net10.0`), package validation enabled,
+  deterministic builds, version `1.0.0`.
+
+Explicitly deferred beyond 1.0 (non-blocking, no commitment implied):
+
+- Property-based fuzzing and long-running adversarial corpora.
+- Repository-wide `.editorconfig` and CI format verification.
+- Full JSON Schema keyword validation (Nuwa remains repair-only).
+- Later public API design: typed repair evidence, structured limit failures,
+  explicit invalid-schema diagnostics.
+- Remaining performance work: benchmarks before/after hot-path changes,
+  further dry-scan/clone-avoidance extensions, parse-result reuse across the
+  salvage boundary (would change the public strategy contract).
+- Unified operation-context limits for remaining text-strategy search.
+- Deferred investigations below (dogfood corpus, duplicate-property policy).
+
 ## Direction
 
 Nuwa is a deterministic JSON repair library for model-produced structured
@@ -121,17 +161,14 @@ Completed in the first architecture slice:
 - Text and salvage execution share one ordered phase runner; node execution
   uses a dedicated runner that preserves mutation budgets and causal reports.
 
-### Parser and strategy construction
-
-
-### Schema expectation reuse
+### Schema expectation reuse (completed)
 
 - Factory-created expectations own a normalized schema snapshot and cache its
   child expectations. Direct-constructor expectations deliberately retain
   live, uncached schema semantics for compatibility; both behaviors are
   documented and covered by tests.
 
-### Parsing and allocation performance
+### Parsing and allocation performance (deferred remainder)
 
 - JavaScript template repair uses a single bounded builder rather than
   reconstructing the complete string after every literal, with a large-input
@@ -147,12 +184,12 @@ returns text and the pipeline owns parsing. Carrying a parsed artifact would
 change the public strategy contract and should be justified by profiling
 rather than introduced as a special-case side channel.
 
-### Unified limits and causality
+### Unified limits and causality (deferred)
 
 - Extend the shared operation context to text-strategy work where iteration or
   speculative search is not already explicitly bounded.
 
-## Later public API design
+## Later public API design (deferred beyond 1.0)
 
 These items should be designed together to avoid accumulating loosely related
 diagnostic properties.
@@ -178,7 +215,7 @@ diagnostic properties.
 - Do not turn malformed schemas into payload repair failures without an
   intentional compatibility decision.
 
-## Deferred investigations
+## Deferred investigations (beyond 1.0)
 
 - Continue the dogfood malformed-output corpus from Guyabano:
   - add a minimized golden vector from workflow
@@ -206,8 +243,6 @@ diagnostic properties.
   subset needed to make safe repairs; it is not intended to replace a
   dedicated dialect-aware validator.
 - Property-based fuzzing and long-running adversarial test corpora.
-- File-based public API analyzer baselines versus the existing reflection
-  snapshot test.
 - Repository-wide `.editorconfig` and CI format verification.
 
 ## Acceptance principles
