@@ -623,7 +623,7 @@ internal static class JsonSchemaNormalizer
 
             foreach (var item in seen)
             {
-                result.Add(item);
+                result.Add((JsonNode?)item);
             }
 
             return result;
@@ -651,7 +651,7 @@ internal static class JsonSchemaNormalizer
                     return type;
                 }
 
-                return new JsonArray { single, "null" };
+                return new JsonArray { (JsonNode?)single, (JsonNode?)"null" };
             }
 
             if (type is JsonArray array)
@@ -673,7 +673,7 @@ internal static class JsonSchemaNormalizer
                     result.Add(item?.DeepClone());
                 }
 
-                result.Add("null");
+                result.Add((JsonNode?)"null");
                 return result;
             }
 

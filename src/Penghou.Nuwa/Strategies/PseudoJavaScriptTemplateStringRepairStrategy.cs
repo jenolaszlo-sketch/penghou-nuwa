@@ -61,7 +61,9 @@ public sealed class PseudoJavaScriptTemplateStringRepairStrategy
             var value =
                 DecodeEscapedBackticks(rawValue);
             var jsonString =
-                JsonSerializer.Serialize(value);
+                JsonSerializer.Serialize(
+                    value,
+                    JsonRepairJsonContext.Default.String);
 
             output ??= new StringBuilder(input.Length);
             output.Append(

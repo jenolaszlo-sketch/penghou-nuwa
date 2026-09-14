@@ -16,6 +16,10 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
     <IsPackable>true</IsPackable>
+    <!-- Certified trim/Native-AOT compatible: enables the trim and AOT
+         analyzers for this project. Type-based strategy registration and
+         FromType carry RequiresUnreferencedCode; all other paths are clean. -->
+    <IsAotCompatible>true</IsAotCompatible>
 
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>

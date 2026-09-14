@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <!-- A runnable proof that the core library and the Microsoft.Extensions.AI
+         middleware work under Native AOT. Built and published only by the
+         native-aot CI job; intentionally not part of the solution so ordinary
+         restore/build/test runs stay light. -->
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Penghou.Nuwa\Penghou.Nuwa.csproj" />
+    <ProjectReference Include="..\..\src\Penghou.Nuwa.Extensions.AI\Penghou.Nuwa.Extensions.AI.csproj" />
+  </ItemGroup>
+
+</Project>

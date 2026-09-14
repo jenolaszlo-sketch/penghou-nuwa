@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Nodes;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text.Json.Nodes;
 
 using System.Text.Json;
 
@@ -241,16 +242,43 @@ public sealed record JsonSchemaExpectation(
     /// enums map to strings. Use the options overload to match how the payload is
     /// actually serialized (e.g. a camelCase naming policy).
     /// </summary>
-    public static JsonSchemaExpectation FromType<T>() =>
+    /// <remarks>
+    /// Deriving a schema from a CLR type uses reflection over that type, so it
+    /// is not safe with trimming unless the type is preserved. Prefer
+    /// <see cref="FromSchemaJson"/> or <see cref="FromSchemaNode"/> (which are
+    /// trim- and Native AOT-safe) for trimmed or ahead-of-time compiled apps.
+    /// </remarks>
+    [RequiresUnreferencedCode(
+        "Deriving a schema from a CLR type uses reflection over that type. " +
+        "Preserve the target type when trimming, or use FromSchemaJson or " +
+        "FromSchemaNode instead.")]
+    public static JsonSchemaExpectation FromType<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>() =>
         FromType(typeof(T));
 
-    public static JsonSchemaExpectation FromType<T>(
+    /// <inheritdoc cref="FromType{T}()" />
+    [RequiresUnreferencedCode(
+        "Deriving a schema from a CLR type uses reflection over that type. " +
+        "Preserve the target type when trimming, or use FromSchemaJson or " +
+        "FromSchemaNode instead.")]
+    public static JsonSchemaExpectation FromType<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>(
         JsonSerializerOptions? options) =>
         FromType(typeof(T), options);
 
+    /// <inheritdoc cref="FromType{T}()" />
+    [RequiresUnreferencedCode(
+        "Deriving a schema from a CLR type uses reflection over that type. " +
+        "Preserve the target type when trimming, or use FromSchemaJson or " +
+        "FromSchemaNode instead.")]
     public static JsonSchemaExpectation FromType(Type type) =>
         FromType(type, null);
 
+    /// <inheritdoc cref="FromType{T}()" />
+    [RequiresUnreferencedCode(
+        "Deriving a schema from a CLR type uses reflection over that type. " +
+        "Preserve the target type when trimming, or use FromSchemaJson or " +
+        "FromSchemaNode instead.")]
     public static JsonSchemaExpectation FromType(
         Type type,
         JsonSerializerOptions? options)

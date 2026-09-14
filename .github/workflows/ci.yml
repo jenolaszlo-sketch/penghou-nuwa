@@ -73,3 +73,28 @@ jobs:
         run: |
           dotnet pack src/Penghou.Nuwa/Penghou.Nuwa.csproj --configuration Release --no-build --output artifacts
           dotnet pack src/Penghou.Nuwa.Extensions.AI/Penghou.Nuwa.Extensions.AI.csproj --configuration Release --no-build --output artifacts
+
+  native-aot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Native AOT prerequisites
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Publish Native AOT smoke
+        run: >
+          dotnet publish tests/Penghou.Nuwa.AotSmoke/Penghou.Nuwa.AotSmoke.csproj
+          --configuration Release
+          --runtime linux-x64
+          --output ./aot-smoke
+
+      - name: Run Native AOT smoke
+        run: ./aot-smoke/Penghou.Nuwa.AotSmoke
+

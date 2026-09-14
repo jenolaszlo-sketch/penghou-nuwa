@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Penghou.Nuwa.Extensions.AI;
 
@@ -8,6 +9,11 @@ namespace Penghou.Nuwa.Extensions.AI;
 /// </summary>
 public static class JsonRepairChatClientBuilderExtensions
 {
+    private const string ReflectionRegistrationWarning =
+        "Building the default repair pipeline activates strategies by type. " +
+        "For trimmed or Native AOT applications, pass an explicit " +
+        "IJsonRepairPipeline resolved from dependency injection instead.";
+
     /// <summary>
     /// Adds a <see cref="JsonRepairChatClient"/> stage to the pipeline.
     /// </summary>
@@ -17,6 +23,13 @@ public static class JsonRepairChatClientBuilderExtensions
     /// strategy set is used.
     /// </param>
     /// <returns>The builder, for chaining.</returns>
+    /// <remarks>
+    /// Building the default pipeline activates strategies by type, so this
+    /// overload is not trim- or Native AOT-safe. Pass an explicit
+    /// <see cref="IJsonRepairPipeline"/> for ahead-of-time compiled apps.
+    /// </remarks>
+    [RequiresUnreferencedCode(ReflectionRegistrationWarning)]
+    [RequiresDynamicCode(ReflectionRegistrationWarning)]
     public static ChatClientBuilder UseJsonRepair(
         this ChatClientBuilder builder,
         Action<JsonRepairOptions>? configure = null)
@@ -35,6 +48,8 @@ public static class JsonRepairChatClientBuilderExtensions
     /// <param name="builder">The builder to extend.</param>
     /// <param name="options">Repair configuration.</param>
     /// <returns>The builder, for chaining.</returns>
+    [RequiresUnreferencedCode(ReflectionRegistrationWarning)]
+    [RequiresDynamicCode(ReflectionRegistrationWarning)]
     public static ChatClientBuilder UseJsonRepair(
         this ChatClientBuilder builder,
         JsonRepairChatClientOptions options)
@@ -57,6 +72,8 @@ public static class JsonRepairChatClientBuilderExtensions
     /// strategy set is used.
     /// </param>
     /// <returns>A repaired-wrapping client.</returns>
+    [RequiresUnreferencedCode(ReflectionRegistrationWarning)]
+    [RequiresDynamicCode(ReflectionRegistrationWarning)]
     public static IChatClient UseJsonRepair(
         this IChatClient innerClient,
         Action<JsonRepairOptions>? configure = null)
@@ -74,6 +91,8 @@ public static class JsonRepairChatClientBuilderExtensions
     /// <param name="innerClient">The client to wrap.</param>
     /// <param name="options">Repair configuration.</param>
     /// <returns>A repaired-wrapping client.</returns>
+    [RequiresUnreferencedCode(ReflectionRegistrationWarning)]
+    [RequiresDynamicCode(ReflectionRegistrationWarning)]
     public static IChatClient UseJsonRepair(
         this IChatClient innerClient,
         JsonRepairChatClientOptions options)

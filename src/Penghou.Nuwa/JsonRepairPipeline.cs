@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Penghou.Nuwa.Strategies;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -95,12 +96,25 @@ public sealed class JsonRepairPipeline
         _tolerantParser = tolerantParser;
     }
 
+    private const string ReflectionRegistrationWarning =
+        "Instantiating repair strategies by type uses runtime activation. " +
+        "Register strategies by instance or factory, or resolve the pipeline " +
+        "from dependency injection, for trimmed or Native AOT applications.";
+
     /// <summary>
     /// Builds a ready-to-use pipeline without a service collection. Strategies
     /// are resolved through public constructors whose parameters are
     /// satisfiable with a null logger; strategies with other dependencies
     /// should be registered with <c>AddJsonRepair</c> instead.
     /// </summary>
+    /// <remarks>
+    /// This overload activates registered strategy types at runtime, so it is
+    /// not trim- or Native AOT-safe. For ahead-of-time compiled apps, register
+    /// strategies by instance or factory and resolve
+    /// <see cref="IJsonRepairPipeline"/> from dependency injection instead.
+    /// </remarks>
+    [RequiresUnreferencedCode(ReflectionRegistrationWarning)]
+    [RequiresDynamicCode(ReflectionRegistrationWarning)]
     public static JsonRepairPipeline Create(
         Action<JsonRepairOptions>? configure = null)
     {
@@ -1047,6 +1061,8 @@ public sealed class JsonRepairPipeline
             ", ",
             reports.Select(report => $"{report.Name}={report.Status}"));
 
+    [RequiresUnreferencedCode(ReflectionRegistrationWarning)]
+    [RequiresDynamicCode(ReflectionRegistrationWarning)]
     private static IReadOnlyList<T> Instantiate<T>(
         IReadOnlyList<Type> types,
         JsonRepairOptions options)
@@ -1064,6 +1080,8 @@ public sealed class JsonRepairPipeline
         return repairs;
     }
 
+    [RequiresUnreferencedCode(ReflectionRegistrationWarning)]
+    [RequiresDynamicCode(ReflectionRegistrationWarning)]
     private static T Instantiate<T>(
         Type type)
         where T : class
@@ -1096,6 +1114,8 @@ public sealed class JsonRepairPipeline
         return (T)repair;
     }
 
+    [RequiresUnreferencedCode(ReflectionRegistrationWarning)]
+    [RequiresDynamicCode(ReflectionRegistrationWarning)]
     private static object? ResolveConstructorArgument(
         Type strategyType,
         ParameterInfo parameter)
@@ -1124,6 +1144,8 @@ public sealed class JsonRepairPipeline
             $"The strategy '{strategyType.Name}' constructor parameter '{parameter.Name}' of type '{parameterType.Name}' cannot be resolved by the non-DI factory. Register the strategy with AddJsonRepair(Action<JsonRepairOptions>) instead.");
     }
 
+    [RequiresUnreferencedCode(ReflectionRegistrationWarning)]
+    [RequiresDynamicCode(ReflectionRegistrationWarning)]
     private static object ResolveNullLogger(
         Type category)
     {

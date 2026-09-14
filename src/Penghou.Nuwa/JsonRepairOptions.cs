@@ -1,4 +1,5 @@
 using Penghou.Nuwa.Strategies;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace Penghou.Nuwa;
@@ -57,6 +58,16 @@ public sealed class JsonRepairOptions
     /// <summary>Ordered node-repair strategies that run against the recovered tree.</summary>
     public IReadOnlyList<Type> NodeRepairs => _nodeRepairs;
 
+    /// <summary>
+    /// Registers a text-repair strategy by type, instantiated via its public
+    /// constructor. Type-based registration uses runtime activation and is not
+    /// trim- or Native AOT-safe; prefer the instance or factory overload in
+    /// trimmed or ahead-of-time compiled apps.
+    /// </summary>
+    [RequiresUnreferencedCode(
+        "Registering strategies by type uses runtime activation. The strategy " +
+        "type and its public constructors must be preserved when trimming; " +
+        "use the instance or factory overload instead.")]
     public JsonRepairOptions AddTextRepair<T>() where T : class, ITextRepair
     {
         _textRepairs.Add(typeof(T));
@@ -70,6 +81,11 @@ public sealed class JsonRepairOptions
     public JsonRepairOptions AddTextRepair(ITextRepair instance) =>
         AddInstance(_textRepairs, instance, "text repair");
 
+    /// <inheritdoc cref="AddTextRepair{T}()" />
+    [RequiresUnreferencedCode(
+        "Registering strategies by type uses runtime activation. The strategy " +
+        "type and its public constructors must be preserved when trimming; " +
+        "use the instance or factory overload instead.")]
     public JsonRepairOptions InsertTextRepairAfter<TAnchor, TNew>()
         where TAnchor : class, ITextRepair
         where TNew : class, ITextRepair
@@ -95,6 +111,11 @@ public sealed class JsonRepairOptions
         return this;
     }
 
+    /// <inheritdoc cref="AddTextRepair{T}()" />
+    [RequiresUnreferencedCode(
+        "Registering strategies by type uses runtime activation. The strategy " +
+        "type and its public constructors must be preserved when trimming; " +
+        "use the instance or factory overload instead.")]
     public JsonRepairOptions AddSalvageRepair<T>() where T : class, ITextRepair
     {
         _salvageRepairs.Add(typeof(T));
@@ -108,6 +129,11 @@ public sealed class JsonRepairOptions
     public JsonRepairOptions AddSalvageRepair(ITextRepair instance) =>
         AddInstance(_salvageRepairs, instance, "salvage repair");
 
+    /// <inheritdoc cref="AddTextRepair{T}()" />
+    [RequiresUnreferencedCode(
+        "Registering strategies by type uses runtime activation. The strategy " +
+        "type and its public constructors must be preserved when trimming; " +
+        "use the instance or factory overload instead.")]
     public JsonRepairOptions InsertSalvageRepairAfter<TAnchor, TNew>()
         where TAnchor : class, ITextRepair
         where TNew : class, ITextRepair
@@ -217,6 +243,11 @@ public sealed class JsonRepairOptions
             strategyType);
     }
 
+    /// <inheritdoc cref="AddTextRepair{T}()" />
+    [RequiresUnreferencedCode(
+        "Registering strategies by type uses runtime activation. The strategy " +
+        "type and its public constructors must be preserved when trimming; " +
+        "use the instance or factory overload instead.")]
     public JsonRepairOptions AddNodeRepair<T>() where T : class, INodeRepair
     {
         _nodeRepairs.Add(typeof(T));
@@ -230,6 +261,11 @@ public sealed class JsonRepairOptions
     public JsonRepairOptions AddNodeRepair(INodeRepair instance) =>
         AddInstance(_nodeRepairs, instance, "node repair");
 
+    /// <inheritdoc cref="AddTextRepair{T}()" />
+    [RequiresUnreferencedCode(
+        "Registering strategies by type uses runtime activation. The strategy " +
+        "type and its public constructors must be preserved when trimming; " +
+        "use the instance or factory overload instead.")]
     public JsonRepairOptions InsertNodeRepairAfter<TAnchor, TNew>()
         where TAnchor : class, INodeRepair
         where TNew : class, INodeRepair
@@ -255,6 +291,10 @@ public sealed class JsonRepairOptions
         return this;
     }
 
+    [RequiresUnreferencedCode(
+        "Validating registered strategies inspects their public constructors " +
+        "and is not trim- or Native AOT-safe. Register strategies by instance " +
+        "or factory for ahead-of-time compiled applications.")]
     internal void Validate()
     {
         ArgumentNullException.ThrowIfNull(Limits);
@@ -354,6 +394,10 @@ public sealed class JsonRepairOptions
             _strategyFactories.Remove(type);
     }
 
+    [RequiresUnreferencedCode(
+        "Validating registered strategies inspects their public constructors " +
+        "and is not trim- or Native AOT-safe. Register strategies by instance " +
+        "or factory for ahead-of-time compiled applications.")]
     private void ValidateStrategies(
         IReadOnlyList<Type> types,
         Type requiredInterface,

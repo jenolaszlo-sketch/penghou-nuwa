@@ -21,6 +21,9 @@
          PublicAPI.Shipped.txt baseline for any additions, removals, or edits. -->
     <NoWarn>$(NoWarn);RS0026;RS0027</NoWarn>
     <IsPackable>true</IsPackable>
+    <!-- Certified trim/Native-AOT compatible: enables the trim and AOT
+         analyzers for this project. -->
+    <IsAotCompatible>true</IsAotCompatible>
 
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>

@@ -26,6 +26,15 @@ Completed for 1.0:
   `Microsoft.Build.Tasks.Git 8.0.0` advisory (NU1902), NuGet auditing intact,
   multi-targeting (`net8.0`/`net9.0`/`net10.0`), package validation enabled,
   deterministic builds, version `1.0.0`.
+- Native AOT and trimming compatibility: both libraries build with
+  `IsAotCompatible`, the reflection-based convenience APIs
+  (`JsonRepairPipeline.Create`, `AddJsonRepair`, `JsonSchemaExpectation.FromType`,
+  type-based strategy overloads) are annotated with
+  `RequiresUnreferencedCode`/`RequiresDynamicCode`, the text strategies use a
+  source-generated `JsonSerializerContext` for the one string they serialize,
+  the AI middleware round-trips tool-call arguments through `JsonNode` instead
+  of reflection-based `JsonSerializer`, and a Native AOT smoke app is
+  published and run in CI. No repair-path behavior changed.
 
 Explicitly deferred beyond 1.0 (non-blocking, no commitment implied):
 

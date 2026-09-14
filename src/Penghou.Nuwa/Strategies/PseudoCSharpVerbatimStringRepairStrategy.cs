@@ -119,7 +119,9 @@ public sealed class PseudoCSharpVerbatimStringRepairStrategy
             budget--;
 
             var value = text[contentStart..end].Replace("\"\"", "\"");
-            var jsonString = JsonSerializer.Serialize(value);
+            var jsonString = JsonSerializer.Serialize(
+                value,
+                JsonRepairJsonContext.Default.String);
             var candidate = text[..start] + jsonString + text[(end + 1)..];
 
             if (IsValidJsonText(candidate))

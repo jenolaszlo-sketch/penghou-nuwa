@@ -188,6 +188,54 @@ does not establish that values such as `"1"` are meaningful filenames.
 - Build requirements met: `net8.0`/`net9.0`/`net10.0` multi-targeting,
   package validation, deterministic builds, and a vulnerability-free
   restore (SourceLink 10.0.401).
+- Trim- and Native AOT-compatible (`IsAotCompatible`), with a dedicated
+  Native AOT smoke run in CI. The repair path itself is reflection-free; the
+  convenience APIs that activate strategies or derive schemas *by type* are
+  annotated `[RequiresUnreferencedCode]`. See below.
+
+### Native AOT and trimming
+
+Nuwa performs no runtime reflection or code generation while repairing. The
+convenience APIs that discover strategies or schemas by type —
+`JsonRepairPipeline.Create`, `AddJsonRepair`, and
+`JsonSchemaExpectation.FromType` — are annotated
+`[RequiresUnreferencedCode]`/`[RequiresDynamicCode]` because they activate
+types at runtime. For ahead-of-time compiled apps, build the pipeline from
+strategy instances and supply the schema explicitly:
+
+```csharp
+using Microsoft.Extensions.Logging.Abstractions;
+using Penghou.Nuwa;
+using Penghou.Nuwa.Strategies;
+
+var pipeline = new JsonRepairPipeline(
+    textRepairs:
+    [
+        new MarkdownJsonFenceRepairStrategy(),
+        new UnicodeDelimiterNormalizationStrategy(),
+        new PseudoCSharpVerbatimStringRepairStrategy(),
+        new PseudoJavaScriptTemplateStringRepairStrategy(),
+    ],
+    salvageRepairs: [new SalvageRepairStrategy()],
+    nodeRepairs:
+    [
+        new SchemaGuidedOptionalNullRemovalStrategy(),
+        new SchemaGuidedJsonStringExpansionStrategy(),
+        new SchemaGuidedScalarToStringCoercionStrategy(),
+    ],
+    logger: NullLogger<JsonRepairPipeline>.Instance,
+    limits: JsonRepairLimits.Default,
+    allowTruncationSalvage: true);
+
+var expectation = JsonSchemaExpectation.FromSchemaJson(schemaJson);
+using var result = await pipeline.RepairAsync(input, expectation);
+```
+
+The same applies to the `Penghou.Nuwa.Extensions.AI` middleware: pass an
+existing pipeline via `UseJsonRepair(client, pipeline, options)` rather than
+the `configure`-callback overloads. `System.Text.Json.Nodes`-based repair
+never needs reflection-based serialization, and tool-call argument
+round-tripping in the middleware uses `JsonNode` directly.
 
 ## New in 0.6: truncation salvage, payload extraction, coercions, confidence, streaming
 

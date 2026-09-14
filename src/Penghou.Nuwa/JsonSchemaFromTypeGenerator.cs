@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -15,8 +16,14 @@ namespace Penghou.Nuwa;
 /// </summary>
 internal static class JsonSchemaFromTypeGenerator
 {
+    private const string TrimWarning =
+        "Deriving a schema from a CLR type reflects over that type's public " +
+        "properties and interfaces. Preserve the type when trimming, or use " +
+        "JsonSchemaExpectation.FromSchemaJson/FromSchemaNode instead.";
+
     private static readonly JsonSerializerOptions DefaultOptions = new();
 
+    [RequiresUnreferencedCode(TrimWarning)]
     public static JsonObject Generate(
         Type type,
         JsonSerializerOptions? options = null)
@@ -29,6 +36,7 @@ internal static class JsonSchemaFromTypeGenerator
             new HashSet<Type>());
     }
 
+    [RequiresUnreferencedCode(TrimWarning)]
     private static JsonObject Build(
         Type type,
         JsonSerializerOptions options,
@@ -89,6 +97,7 @@ internal static class JsonSchemaFromTypeGenerator
         }
     }
 
+    [RequiresUnreferencedCode(TrimWarning)]
     private static JsonObject BuildObject(
         Type type,
         JsonSerializerOptions options,
@@ -125,7 +134,7 @@ internal static class JsonSchemaFromTypeGenerator
                 visited);
 
             if (IsRequired(property))
-                required.Add(name);
+                required.Add((JsonNode?)name);
         }
 
         var schema = new JsonObject
@@ -189,6 +198,7 @@ internal static class JsonSchemaFromTypeGenerator
         type == typeof(double) ||
         type == typeof(decimal);
 
+    [RequiresUnreferencedCode(TrimWarning)]
     private static bool TryGetDictionaryValueType(
         Type type,
         out Type valueType)
@@ -210,6 +220,7 @@ internal static class JsonSchemaFromTypeGenerator
         return false;
     }
 
+    [RequiresUnreferencedCode(TrimWarning)]
     private static bool TryGetElementType(
         Type type,
         out Type elementType)
@@ -242,6 +253,7 @@ internal static class JsonSchemaFromTypeGenerator
         return false;
     }
 
+    [RequiresUnreferencedCode(TrimWarning)]
     private static IEnumerable<Type> EnumerateSelfAndInterfaces(
         Type type)
     {

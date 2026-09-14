@@ -1,5 +1,6 @@
 using Microsoft.Extensions.AI;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 
@@ -31,6 +32,11 @@ namespace Penghou.Nuwa.Extensions.AI;
 /// </remarks>
 public class JsonRepairChatClient : DelegatingChatClient
 {
+    private const string ReflectionRegistrationWarning =
+        "Building the default repair pipeline activates strategies by type. " +
+        "For trimmed or Native AOT applications, pass an explicit " +
+        "IJsonRepairPipeline resolved from dependency injection instead.";
+
     private readonly JsonRepairChatClientOptions _options;
     private readonly IJsonRepairPipeline _pipeline;
     private readonly ConcurrentDictionary<string, JsonSchemaExpectation>
@@ -47,6 +53,13 @@ public class JsonRepairChatClient : DelegatingChatClient
     /// Configures the underlying Nuwa repair pipeline. When null, the default
     /// strategy set is used.
     /// </param>
+    /// <remarks>
+    /// Building the default pipeline activates strategies by type, so this
+    /// constructor is not trim- or Native AOT-safe. Pass an explicit
+    /// <see cref="IJsonRepairPipeline"/> for ahead-of-time compiled apps.
+    /// </remarks>
+    [RequiresUnreferencedCode(ReflectionRegistrationWarning)]
+    [RequiresDynamicCode(ReflectionRegistrationWarning)]
     public JsonRepairChatClient(
         IChatClient innerClient,
         Action<JsonRepairOptions>? configure = null)
@@ -63,6 +76,13 @@ public class JsonRepairChatClient : DelegatingChatClient
     /// </summary>
     /// <param name="innerClient">The client to wrap.</param>
     /// <param name="options">Repair configuration.</param>
+    /// <remarks>
+    /// Building the default pipeline activates strategies by type, so this
+    /// constructor is not trim- or Native AOT-safe. Pass an explicit
+    /// <see cref="IJsonRepairPipeline"/> for ahead-of-time compiled apps.
+    /// </remarks>
+    [RequiresUnreferencedCode(ReflectionRegistrationWarning)]
+    [RequiresDynamicCode(ReflectionRegistrationWarning)]
     public JsonRepairChatClient(
         IChatClient innerClient,
         JsonRepairChatClientOptions options)
@@ -73,6 +93,8 @@ public class JsonRepairChatClient : DelegatingChatClient
     {
     }
 
+    [RequiresUnreferencedCode(ReflectionRegistrationWarning)]
+    [RequiresDynamicCode(ReflectionRegistrationWarning)]
     private static IJsonRepairPipeline CreatePipeline(
         JsonRepairChatClientOptions options)
     {
@@ -231,8 +253,9 @@ public class JsonRepairChatClient : DelegatingChatClient
         {
             // The connector parsed the arguments; re-serialize so schema-
             // guided node repair can fix valid-but-wrong-shaped payloads.
-            json = JsonSerializer.Serialize(
-                fcc.Arguments);
+            // Converted via JsonNode (not reflection-based serialization)
+            // so the middleware stays trim/Native-AOT compatible.
+            json = FunctionCallArgumentJson.ToJson(fcc.Arguments);
         }
         else if (fcc.RawRepresentation is string raw)
         {
@@ -274,9 +297,9 @@ public class JsonRepairChatClient : DelegatingChatClient
 
         try
         {
-            var reparsed = JsonSerializer.Deserialize<
-                Dictionary<string, object?>>(
-                repairedText);
+            // Values come back boxed as JsonElement, matching the previous
+            // reflection-based round-trip exactly.
+            var reparsed = FunctionCallArgumentJson.FromJson(repairedText);
 
             if (reparsed is not null)
             {
